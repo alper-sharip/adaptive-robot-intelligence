@@ -50,3 +50,39 @@ so smooth trajectories are still the right next move.
 A top-down grasp at (0.7, ±0.3, 0.4) is unreachable: 50 random IK restarts all stop at
 8.66 mm. The wrist centre would be 0.81 m from the shoulder, past full extension.
 The table workspace for top-down grasps is therefore limited to roughly x ≤ 0.65 m.
+
+## 2026-11-14: Stage 2 (M5, M6, M7, M9)
+
+Built: pick-and-place scene (MjSpec), Cartesian controller (IK at 100 Hz on top of joint
+servos + gravity feedforward), minimum-jerk pose trajectories, scripted pick-and-place state
+machine, seeded 100-episode evaluation with failure attribution. Results: docs/results_stage2.md.
+
+### Finding: a held cube "slipped" ~1.5 mm/s, but it wasn't friction
+**Observation:** during transport the cube sank ~4 mm relative to the fingers, while the TCP
+height stayed constant (so not arm sag). The slip was identical at friction 1.0, 0.5 and 0.3.
+**Cause:** MuJoCo contacts are soft constraints. With the default pyramidal friction cone and
+impratio = 1, a sustained tangential load produces slow creep.
+**Fix:** elliptic friction cone + impratio = 10 (MuJoCo's recommendation for grasping).
+Median slip 3.0 mm → 0.4 mm over 100 episodes.
+
+### Bug: the cube friction setting did nothing
+**Symptom:** identical results for friction 1.0, 0.5 and 0.3 (suspicious in itself).
+**Cause:** for two touching geoms with equal priority, MuJoCo uses the **maximum** of their
+friction coefficients. The finger pads are 1.0, so the cube's value never mattered.
+**Fix:** cube geom `priority=1`, so its friction governs its contacts.
+**Lesson:** when a parameter sweep gives identical numbers, suspect the parameter isn't
+connected before concluding the system is insensitive to it.
+
+### Finding: the gripper is weak: ~1 N per finger
+Measured with `mj_contactForce`: the gripper tendon pulls with 2.0 N, and the tendon couples
+both fingers with coefficient 0.5, so each finger presses ~1.0 N. Friction capacity
+2·μ·1 N vs 0.98 N weight predicts exactly the observed cliff: μ = 1.0 works, μ ≤ 0.5 fails 100%.
+
+### Bug: stronger gripper made fast grasps fail (7% success)
+**Symptom:** gripper stiffness ×10 at 1.0 m/s → 93/100 grasp failures, worse than ×1.
+**Diagnosis:** finger gap reached 13.9 mm on a 40 mm cube; cube centre sank to 11 mm (below
+its half-height). The fingers penetrated the cube.
+**Cause:** I scaled kp ×10 but left kd unchanged. Damping ratio ζ = kd / (2√(kp·m)) fell by
+√10 ≈ 3.2×, so the fingers closed underdamped and fast enough to tunnel into the contact.
+**Fix:** scale kd by √(scale) to keep ζ constant. 7% → 100%.
+**Lesson:** never change stiffness without asking what happens to the damping ratio.

@@ -3,7 +3,6 @@
 Run:  python scripts/inspect_model.py
 """
 
-import mujoco
 import numpy as np
 
 from ari.robot.model import load_panda, reset_to_home

@@ -17,11 +17,35 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M2 Joint control | 🧪 Tested | `tests/test_control.py`, step-response plots |
 | M3 Forward kinematics (from scratch, DH) | 🧪 Tested | matches MuJoCo to 1e-9 m over 200 random configs |
 | M4 Inverse kinematics (damped least squares) | 🧪 Tested | 100% success on 100 random reachable targets, mean error 0.05 mm |
-| M5+ Scene, trajectories, pick-and-place, … | ⬜ Planned | see `docs/roadmap.md` |
+| M5 Pick-and-place scene + Cartesian controller | 🧪 Tested | `tests/test_pick_place.py` |
+| M6 Minimum-jerk trajectories | 🧪 Tested | `tests/test_trajectory.py` |
+| M7 Scripted pick-and-place baseline | 🧪 Tested | 100/100 seeded episodes, stress-tested in 9 configurations |
+| M9 Seeded evaluation with confidence intervals | ✅ Implemented | `scripts/evaluate_scripted.py` |
+| M8 Collision-aware planning | ⬜ Planned | next |
+| Stage 3+ Perception, learning, … | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
 
 ## Results so far
+
+### Scripted pick-and-place (Stage 2)
+
+![pick and place](outputs/pick_place_seed3.gif)
+
+100 seeded episodes per row, cube pose from simulator ground truth. Full table and analysis: [`docs/results_stage2.md`](docs/results_stage2.md).
+
+| Condition | Success (95% CI) | Main failure |
+|---|---|---|
+| Default (μ = 1.0, 0.25 m/s) | **100%** (96.3-100) | none |
+| Slippery cube (μ = 0.5) | **0%** | grasp fails: only ~1 N per finger |
+| Fast (1.0 m/s) | 89% (81.4-93.7) | cube dropped in transport |
+| Fast, gripper stiffness ×10 | 100% (96.3-100) | none (placement error 6 mm vs 2 mm) |
+
+Debugging these runs uncovered four simulation issues: friction creep, a friction parameter
+that had no effect, a weak gripper, and an underdamped finger servo. All four are diagnosed in
+[`docs/devlog.md`](docs/devlog.md).
+
+### Reaching (Stage 1)
 
 **Reaching Cartesian targets** (gripper pointing down, IK solution executed in physics for 1.5 s):
 
@@ -50,7 +74,9 @@ python scripts/inspect_model.py                   # what the robot is made of
 mjpython scripts/view_panda.py                    # interactive viewer (use `python` on Linux)
 python scripts/joint_step_response.py             # control experiment -> outputs/
 python scripts/ik_demo.py --gravity-comp          # IK + execution -> outputs/
-pytest -s                                         # 19 tests
+python scripts/pick_place_demo.py --seed 3        # one episode -> GIF + plots in outputs/
+python scripts/evaluate_scripted.py               # 100-episode evaluation (~2-6 min)
+pytest                                            # 53 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
@@ -60,7 +86,10 @@ If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`
 ```
 src/ari/
   robot/      model loading, transforms, forward kinematics, Jacobian, IK
-  control/    joint-space PD control, gravity compensation, step-response metrics
+  control/    joint-space PD control, gravity compensation, Cartesian (IK-based) controller
+  planning/   minimum-jerk pose trajectories
+  envs/       pick-and-place scene with seeded randomization
+  skills/     scripted pick-and-place policy + episode runner with failure attribution
 scripts/      runnable experiments
 tests/        automated checks (kinematics vs MuJoCo, IK success rate, control behaviour)
 docs/         roadmap, development log, concept notes

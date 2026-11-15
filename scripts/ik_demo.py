@@ -16,9 +16,8 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-from ari.control.joint import arm_actuator_ids, run_targets
+from ari.control.joint import run_targets
 from ari.robot.ik import Q_HOME, solve_ik
-from ari.robot.kinematics import tcp_pose
 from ari.robot.model import TCP_OFFSET, arm_qpos_indices, load_panda, reset_to_home
 from ari.robot.transforms import make_T, rot_x
 

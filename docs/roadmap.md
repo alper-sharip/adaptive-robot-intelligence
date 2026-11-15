@@ -10,11 +10,11 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🧪 M4 Inverse kinematics (damped least squares + null space), verified on random targets
 
 ## Stage 2: Manipulation
-- ⬜ M5 Scene with table + objects; Cartesian controller
-- ⬜ M6 Trajectory generation (min-jerk / quintic)
-- ⬜ M7 Scripted pick-and-place state machine (ground-truth object pose)
+- 🧪 M5 Scene with cube + target (MjSpec); Cartesian controller (IK + gravity feedforward)
+- 🧪 M6 Minimum-jerk pose trajectories
+- 🧪 M7 Scripted pick-and-place: 100/100 at defaults, stress-tested (docs/results_stage2.md)
 - ⬜ M8 Collision-aware planning (RRT-Connect with MuJoCo collision checks)
-- ⬜ M9 Seeded, randomized task environment + evaluation script
+- 🧪 M9 Seeded randomized environment + evaluation with CIs and failure attribution
 
 ## Stage 3: Perception
 - ⬜ M10 Simulated RGB-D camera, intrinsics/extrinsics

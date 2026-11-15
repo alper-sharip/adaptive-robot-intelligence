@@ -69,3 +69,18 @@ def quat_to_rot(q: np.ndarray) -> np.ndarray:
             [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
         ]
     )
+
+
+def axis_angle_to_rot(w: np.ndarray) -> np.ndarray:
+    """Rotation vector (axis * angle) -> rotation matrix: Rodrigues' formula, the 'exp map'.
+
+    Inverse of rot_to_axis_angle. Together they let us interpolate rotations:
+    R(s) = R0 @ exp(s * log(R0^T R1)) turns smoothly from R0 (s=0) to R1 (s=1)
+    about a single fixed axis. This is the matrix form of quaternion slerp.
+    """
+    theta = np.linalg.norm(w)
+    if theta < 1e-12:
+        return np.eye(3)
+    k = w / theta
+    K = np.array([[0, -k[2], k[1]], [k[2], 0, -k[0]], [-k[1], k[0], 0]])
+    return np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * K @ K
