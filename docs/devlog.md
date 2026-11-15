@@ -127,3 +127,44 @@ A margin test assumed the fingertips would be ~1 cm above the wall; the checker 
 It was right: pointing down across the wall, the open fingers (8 cm gap) straddle the 3 cm
 wall, 25 mm from each face. Rotating the hand 90° gives the intended geometry. Measured
 fingertip offset: 8.9 mm below the TCP. The margin flips exactly at 20 mm clearance.
+
+## 2026-11-14: Stage 3 perception (M10, M11, M12)
+
+Built: fixed RGB-D camera (MjSpec), pinhole camera model with explicit OpenCV/OpenGL
+conventions, colour + depth cube/target localization, sensor noise model, VisionPolicy that
+feeds estimates into the unchanged Stage 2 / M8 policies. Results: docs/results_stage3.md.
+
+### Verification of the camera model before using it
+Back-projecting the renderer's depth for ground-truth floor pixels gives z = 0.00 mm, and for
+cube pixels a maximum of 40.00 mm (the cube's top); the projected cube centre lands inside the
+cube's ground-truth mask. That checks intrinsics, extrinsics, the y/z axis flip between
+OpenGL and OpenCV, and the half-pixel centre convention in one go.
+
+### Finding: the floor is a mirror
+Menagerie's floor is reflective; the red cube's reflection is red too. Colour alone sees a
+ghost cube below the table; depth puts those pixels at table height, so a 5 mm height cut
+removes them. (Same problem as shiny tables for real cameras.)
+
+### Bug: "highest points" top-face selection is biased under noise
+**First method:** top face = points within 4 mm of the 95th-percentile height.
+**Symptom:** with the "poor" noise model, height biased +6.8 mm and xy error 7.8 mm (median),
+on perfect data it was exact.
+**Cause:** selection bias. Thresholding noisy heights keeps the points whose noise pushed them
+UP; depth noise acts along the viewing ray, and the camera looks down at ~50°, so "pushed up"
+also means "pushed toward the camera": biased xy.
+**Fix:** median-filter the depth image, then find the top face as the MODE of point heights
+(mean-shift), with a band symmetric around it. Poor noise: xy 7.79 → 0.79 mm, height bias
++6.84 → +0.24 mm.
+
+### Bug in the fix: smoothing the histogram smeared the top face
+**First attempt at the mode:** histogram smoothed over ±4 mm, take the peak. On PERFECT depth
+this gave 14.5 mm xy error and 44° yaw error.
+**Cause:** the smoothing window was wider than the gap between the top-face spike and the
+upper parts of the side faces, so the "peak" moved down into the sides and side points
+entered the top-face set (wrecking the rectangle fit for yaw).
+**Fix:** mean-shift from the fullest 1 mm bin: converges to the true mode without blurring it.
+
+### Environment issue: headless rendering
+Rendering needs `MUJOCO_GL=egl` on display-less Linux (servers, Colab). `ari/__init__.py`
+now sets it automatically when there is no DISPLAY, and `tests/conftest.py` imports `ari`
+first so it applies before `mujoco` is imported.

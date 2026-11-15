@@ -22,7 +22,10 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M7 Scripted pick-and-place baseline | 🧪 Tested | 100/100 seeded episodes, stress-tested in 9 configurations |
 | M9 Seeded evaluation with confidence intervals | ✅ Implemented | `scripts/evaluate_scripted.py` |
 | M8 Collision-aware planning (RRT-Connect, 7-DoF posture search) | 🧪 Tested | 96% clean success over a random wall vs 60% for a hand-written heuristic |
-| Stage 3+ Perception, learning, … | ⬜ Planned | see `docs/roadmap.md` |
+| M10 RGB-D camera model | 🧪 Tested | back-projected renderer depth matches geometry to < 0.1 mm |
+| M11 Cube and target localization | 🧪 Tested | cube ~0.3-0.6 mm, target ~1 mm median error |
+| M12 Vision-driven pick-and-place | 🧪 Tested | same success as ground truth under 3 noise levels |
+| Stage 4+ Imitation learning, RL, … | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
 
@@ -44,6 +47,22 @@ and RL policies are compared on a fixed, seeded evaluation set.
 Debugging these runs uncovered four simulation issues: friction creep, a friction parameter
 that had no effect, a weak gripper, and an underdamped finger servo. All four are diagnosed in
 [`docs/devlog.md`](docs/devlog.md).
+
+### Perception (Stage 3)
+
+![perception](outputs/perception_seed3_realistic.png)
+
+The robot localizes the cube and target from one RGB-D image (colour segmentation + depth
+back-projection). 100 seeded episodes per cell. Full analysis: [`docs/results_stage3.md`](docs/results_stage3.md).
+
+| Scene / policy | Ground truth | Vision, no noise | Vision, realistic noise | Vision, poor noise |
+|---|---|---|---|---|
+| Open table / scripted | 100% | 100% | 100% | 100% |
+| Wall / planned | 96% | 96% | 98% | 98% |
+
+Making localization robust to depth noise took a bias fix: choosing the cube's top face as "the
+highest points" biased its height by +6.8 mm under noise. A mode-based estimate with depth
+filtering cut the xy error 10× (7.8 → 0.8 mm). See [`docs/devlog.md`](docs/devlog.md).
 
 ### Collision-aware planning (M8)
 
@@ -94,10 +113,14 @@ python scripts/pick_place_demo.py --seed 3        # one episode -> GIF + plots i
 python scripts/evaluate_scripted.py               # 100-episode evaluation (~2-6 min)
 python scripts/pick_place_demo.py --wall --policy planned --seed 1   # planning demo
 python scripts/evaluate_wall.py --policy planned  # naive vs heuristic vs planned
-pytest                                            # 67 tests
+python scripts/perception_demo.py --seed 3        # what the camera sees -> outputs/
+python scripts/evaluate_vision.py --scene wall --noise realistic   # vision-driven robot
+pytest                                            # 91 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
+On Linux without a display (servers, Colab), rendering uses `MUJOCO_GL=egl`; the package sets
+this automatically if you import `ari` before `mujoco`.
 
 ## Repository layout
 
@@ -107,6 +130,7 @@ src/ari/
   control/    joint-space PD control, gravity compensation, Cartesian (IK-based) controller
   planning/   trajectories, collision checking, RRT-Connect, redundancy resolution
   envs/       pick-and-place scene with seeded randomization
+  perception/ RGB-D camera model, colour + depth localization, noise model, vision-driven policy wrapper
   skills/     scripted and planned pick-and-place policies, episode runner with failure attribution
 scripts/      runnable experiments
 tests/        automated checks (kinematics vs MuJoCo, IK success rate, control behaviour)

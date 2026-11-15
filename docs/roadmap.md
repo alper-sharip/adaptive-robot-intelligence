@@ -17,9 +17,9 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🧪 M9 Seeded randomized environment + evaluation with CIs and failure attribution
 
 ## Stage 3: Perception
-- ⬜ M10 Simulated RGB-D camera, intrinsics/extrinsics
-- ⬜ M11 Object segmentation + 3D localization (error measured vs ground truth)
-- ⬜ M12 Vision-driven pick-and-place (classical baseline v1)
+- 🧪 M10 Simulated RGB-D camera, intrinsics/extrinsics; verified against renderer depth to < 0.1 mm
+- 🧪 M11 Colour + depth localization: cube 0.3-0.6 mm, target ~1 mm (median), with a sensor noise model
+- 🧪 M12 Vision-driven pick-and-place: matches ground-truth success in all 6 conditions (docs/results_stage3.md)
 
 ## Stage 4: Imitation learning
 - ⬜ M13 Demo collection in LeRobotDataset format

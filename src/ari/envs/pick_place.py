@@ -45,6 +45,11 @@ class SceneConfig:
     wall_thickness: float = 0.03
     wall_x: tuple = (0.25, 0.75)            # extent along x
     wall_height: tuple = (0.18, 0.30)       # sampled per episode
+    # Fixed RGB-D camera (M10): in front of the table, looking back toward the robot so
+    # the arm (at home, above x~0.55) does not hide the table.
+    camera_pos: tuple = (1.05, 0.0, 0.70)
+    camera_target: tuple = (0.48, 0.0, 0.0)
+    camera_fovy: float = 45.0              # degrees, vertical field of view
 
     @classmethod
     def with_wall(cls, **kw) -> "SceneConfig":
@@ -98,6 +103,11 @@ def build_model(cfg: SceneConfig) -> mujoco.MjModel:
             size=[(cfg.wall_x[1] - cfg.wall_x[0]) / 2, cfg.wall_thickness / 2, h / 2],
             rgba=[0.55, 0.55, 0.6, 1.0],
         )
+    from ari.perception.camera import look_at_quat
+
+    spec.worldbody.add_camera(name="front_cam", pos=list(cfg.camera_pos),
+                              quat=list(look_at_quat(cfg.camera_pos, cfg.camera_target)),
+                              fovy=cfg.camera_fovy)
     model = spec.compile()
     if cfg.elliptic_cone:
         model.opt.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
