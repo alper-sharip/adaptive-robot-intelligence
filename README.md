@@ -32,7 +32,10 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M16 Gymnasium environments | 🧪 Tested | `check_env` passes; shaping reward telescopes |
 | M17 PPO from scratch | 🧪 Tested | verified on Pendulum-v1; reach 100% (3 seeds); pick-and-place from scratch 0% |
 | M18 Residual RL on the cloned policy | 🧪 Tested | 66% → 92-93% (2 seeds) |
-| Stage 6+ Language, benchmark, report | ⬜ Planned | see `docs/roadmap.md` |
+| M19 Instruction following (parser + skill; end-to-end language policy) | 🧪 Tested | 149/150 modular; end-to-end 108, 144, 146 of 150 over three seeds |
+| M20 Task planner: validation, monitoring, recovery | 🧪 Tested | 95% of two-step tasks with injected faults (35-45% without monitoring) |
+| M21 Vision-language-action fine-tuning | ⬜ Not attempted | needs a GPU and pretrained weights |
+| Stage 7 Benchmark, report | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
 
@@ -93,6 +96,43 @@ Full analysis: [`docs/results_stage5.md`](docs/results_stage5.md).
 - Half of the residual policy's gain is exploration noise freeing the clone from small stalls;
   the noise-only baseline is what separates that from learning.
 - RL traded placement accuracy (4 mm → 10 mm) for speed and success, as the reward allowed.
+
+### Language and task-level autonomy (Stage 6)
+
+![two-step instruction with injected faults](outputs/language_seed7_faults.gif)
+
+*"please move the yellow block onto the blue target. after that lift the blue cube and set it on
+the green area". Twice during this run something is knocked out of place; the executor notices
+from its own checks and redoes the step.*
+
+Three cubes, three targets, instructions from a small generated grammar (45 words). Full
+analysis, including a test split that turned out not to test anything and a conclusion from
+one training seed that two more seeds overturned: [`docs/results_stage6.md`](docs/results_stage6.md).
+
+| One instruction, 150 episodes | Seen sentences | New phrasing | New cube-target pairing | Total |
+|---|---|---|---|---|
+| Modular: GRU parser + Stage 4 learned skill | 100% | 98% | 100% | 149 |
+| End-to-end language policy, 3 seeds | 88 / 100 / 100% | 80 / 100 / 96% | 48 / 88 / 96% | 108 / 144 / 146 |
+
+| Two-step tasks, 100 episodes | No faults | Faults injected (60 of 100 tasks) |
+|---|---|---|
+| Learned skill, no monitoring | 92% | 45% |
+| Learned skill + result checking and retries | 92% | 60% |
+| Learned skill + checking + classical fallback skill | 95% | **95%** |
+
+- The end-to-end policy (one network from sentence and scene to actions, trained by imitation
+  only) can nearly match the modular system, but not reliably: identical code gives 108, 144 or
+  146 depending on the seed, and 2 or 148 when its text encoder is pretrained.
+- Each run's grounding is settled in the first training epoch and then kept. My first write-up,
+  from one seed, claimed word order could not be learned from actions; two more seeds showed
+  that was wrong. Both are in the results file.
+- Because the policy's attention can be read out, every failure is attributed: wrong object
+  (grounding) or right object and a missed grasp (motion).
+- Checking results is what gives robustness; a learned skill retried outside its training
+  conditions keeps failing, so retries go to a classical skill.
+- The plan is validated before the robot moves: 5 of 100 tasks were refused, including both
+  that had been misread. 95% is therefore the ceiling in the second table.
+- VLA fine-tuning (M21) was not attempted.
 
 ### Learning from images (M15, CPU-scale)
 
@@ -185,7 +225,13 @@ python scripts/train_vision.py --demos 200 --epochs 18 --name my_vision   # imag
 python scripts/train_rl.py reach --steps 200000   # RL from scratch (~4 min on 2 cores)
 python scripts/train_rl.py residual --base outputs/models/bc_reactive_100.pt --steps 400000
 python scripts/evaluate_bc.py --joint-interp --disturb outputs/models/rl_residual.pt
-pytest                                            # 129 tests
+python scripts/train_language.py parser           # instruction parsers (seconds)
+python scripts/train_language.py policy --seed 2  # language-conditioned policy (~10 min on 2 cores)
+python scripts/evaluate_language.py m19           # one instruction per episode, 3 systems
+python scripts/evaluate_language.py m20           # two-step tasks, with and without faults
+python scripts/language_demo.py "put the red cube on the green target, then move the yellow cube to the blue target"
+python scripts/language_demo.py --seed 7 --faults # recovery demo -> GIF
+pytest                                            # 149 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
@@ -198,8 +244,9 @@ this automatically if you import `ari` before `mujoco`.
 src/ari/
   robot/      model loading, transforms, forward kinematics, Jacobian, IK
   control/    joint-space PD control, gravity compensation, Cartesian (IK-based) controller
-  planning/   trajectories, collision checking, RRT-Connect, redundancy resolution
-  envs/       pick-and-place scene with seeded randomization
+  planning/   trajectories, collision checking, RRT-Connect, redundancy resolution, task planner
+  envs/       pick-and-place scene with seeded randomization; multi-object scene; Gymnasium wrappers
+  language/   instruction grammar, parsers, language-conditioned policy, evaluation
   rl/         PPO, task builders, residual policy
   learning/   observation/action spaces, demonstrations, behaviour cloning, DAgger, evaluation
   perception/ RGB-D camera model, colour + depth localization, noise model, vision-driven policy wrapper

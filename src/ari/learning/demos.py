@@ -40,7 +40,10 @@ class ActionExecutor:
         speed decides what is feasible."""
         self.env = env
         self.ctrl = CartesianController(env.model, env.data)
-        self.ctrl.reset()
+        # Start the commanded posture at the MEASURED one (identical to home right after a
+        # reset; matters when an executor is created mid-episode, as the task planner does).
+        self.ctrl.reset(env.data.qpos[env.arm_qpos].copy())
+        self.ctrl.gripper_cmd = float(env.data.ctrl[7])
         self.every = int(round(POLICY_DT / self.ctrl.control_dt))
         self.prev = env.tcp_pose().copy()
         self.joint_interp = joint_interp
@@ -160,32 +163,46 @@ class RolloutResult:
     max_cube_height: float
 
 
-def rollout(env: PickPlaceEnv, policy, seed: int, max_time: float = 25.0, disturbance=None,
-            frame_callback=None, joint_interp: bool = False) -> RolloutResult:
-    """Run a learned (or any obs->action) policy closed-loop for one seeded episode.
+def run_policy(env: PickPlaceEnv, ex: "ActionExecutor", policy, max_time: float = 25.0, disturbance=None,
+               frame_callback=None, obs_fn=make_obs) -> tuple[bool, float]:
+    """Run a policy from the CURRENT state until the task is done or time runs out.
+    Returns (success, highest cube height reached). Used by rollout() and by the task
+    planner (Stage 6), which runs several skills one after another in the same episode.
 
-    policy: callable obs -> action (5,), with an optional .reset().
-    disturbance: optional callable (env, t) applied every policy step (e.g. move the cube).
-    Success = cube resting in the target zone, gripper open, held for 0.5 s.
+    Success = cube resting in the target zone, gripper open and raised, held for 0.5 s.
     """
-    env.reset(seed)
-    ex = ActionExecutor(env, joint_interp=joint_interp)
-    if hasattr(policy, "reset"):
-        policy.reset()
-    half = env.cfg.cube_half_size
     max_z, ok_time = 0.0, 0.0
     t0 = env.data.time
     while env.data.time - t0 < max_time:
         if disturbance is not None:
             disturbance(env, env.data.time - t0)
-        ex.step(policy(make_obs(env)))
+        ex.step(policy(obs_fn(env)))
         if frame_callback is not None:
             frame_callback(env)
         max_z = max(max_z, float(env.data.xpos[env.cube_body][2]))
         done = env.is_success() and env.finger_width() > 0.07 and env.tcp_pose()[2, 3] > 0.06
         ok_time = ok_time + POLICY_DT if done else 0.0
         if ok_time >= 0.5:
-            return RolloutResult(seed, True, "", env.placement_error(), env.data.time - t0, max_z)
+            return True, max_z
+    return False, max_z
+
+
+def rollout(env: PickPlaceEnv, policy, seed: int, max_time: float = 25.0, disturbance=None,
+            frame_callback=None, joint_interp: bool = False) -> RolloutResult:
+    """Run a learned (or any obs->action) policy closed-loop for one seeded episode.
+
+    policy: callable obs -> action (5,), with an optional .reset().
+    disturbance: optional callable (env, t) applied every policy step (e.g. move the cube).
+    """
+    env.reset(seed)
+    ex = ActionExecutor(env, joint_interp=joint_interp)
+    if hasattr(policy, "reset"):
+        policy.reset()
+    half = env.cfg.cube_half_size
+    t0 = env.data.time
+    success, max_z = run_policy(env, ex, policy, max_time, disturbance, frame_callback)
+    if success:
+        return RolloutResult(seed, True, "", env.placement_error(), env.data.time - t0, max_z)
     if max_z < half + 0.03:
         failure = "never_lifted"
     elif not env.cube_on_table():
@@ -202,5 +219,8 @@ def move_cube(env: PickPlaceEnv, xy) -> None:
     c = env.cube_qpos
     env.data.qpos[c:c + 2] = xy
     env.data.qpos[c + 2] = env.cfg.cube_half_size
-    env.data.qvel[env.model.joint("cube_joint").dofadr[0]:][:6] = 0
+    dof = getattr(env, "cube_dofadr", None)
+    if dof is None:
+        dof = env.model.joint("cube_joint").dofadr[0]
+    env.data.qvel[dof:dof + 6] = 0
     mujoco.mj_forward(env.model, env.data)

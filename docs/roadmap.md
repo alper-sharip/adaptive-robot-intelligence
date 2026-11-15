@@ -32,9 +32,9 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🧪 M18 Residual RL on the 100-demo clone: 66% → 92-93% nominal (2 seeds), 43% → 64-73% disturbed (docs/results_stage5.md)
 
 ## Stage 6: Autonomous intelligence
-- ⬜ M19 Language-conditioned policy
-- ⬜ M20 Planner over verified skills + failure recovery
-- ⬜ M21 VLA fine-tuning investigation
+- 🧪 M19 Language-conditioned policy: multi-object scene, generated instruction grammar with held-out splits; GRU parser + Stage 4 skill 149/150; end-to-end language policy (behaviour cloning only) 108, 144, 146 of 150 over three seeds, every failure attributed to grounding or motion (docs/results_stage6.md)
+- 🧪 M20 Planner over verified skills + failure recovery: plan validation before motion (5 refusals, no misunderstood instruction executed), post-condition monitoring with retries, learned skill with classical fallback: 95% of two-step tasks with injected faults vs 35-45% without monitoring
+- ⬜ M21 VLA fine-tuning investigation: not attempted (needs a GPU and pretrained weights)
 
 ## Stage 7: Evaluation & portfolio
 - ⬜ M22 Generalization benchmark

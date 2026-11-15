@@ -14,3 +14,7 @@ outputs/models/*
 !outputs/models/rl_residual.json
 !outputs/models/rl_reach.pt
 !outputs/models/bc_reactive_100.pt
+!outputs/models/language_parser.pt
+!outputs/models/language_parser.json
+!outputs/models/language_policy.pt
+!outputs/models/language_policy.json

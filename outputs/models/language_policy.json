@@ -1,0 +1,313 @@
+{
+ "args": {
+  "what": "policy",
+  "demos": 500,
+  "epochs": 60,
+  "seed": 2,
+  "pretrained_text": false,
+  "attention_lr_scale": 1.0,
+  "name": "lp_scratch_s2"
+ },
+ "history": [
+  {
+   "epoch": 1,
+   "val_motion": 0.05775302276015282,
+   "grounding": 0.9779148101806641
+  },
+  {
+   "epoch": 2,
+   "val_motion": 0.03518306091427803,
+   "grounding": 0.9816434979438782
+  },
+  {
+   "epoch": 3,
+   "val_motion": 0.03242984414100647,
+   "grounding": 0.9812132716178894
+  },
+  {
+   "epoch": 4,
+   "val_motion": 0.01560676284134388,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 5,
+   "val_motion": 0.013543115928769112,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 6,
+   "val_motion": 0.01716814562678337,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 7,
+   "val_motion": 0.013139015063643456,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 8,
+   "val_motion": 0.008789430372416973,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 9,
+   "val_motion": 0.012604305520653725,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 10,
+   "val_motion": 0.008844776079058647,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 11,
+   "val_motion": 0.006192836910486221,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 12,
+   "val_motion": 0.00801841914653778,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 13,
+   "val_motion": 0.006963295862078667,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 14,
+   "val_motion": 0.0045241606421768665,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 15,
+   "val_motion": 0.007155964151024818,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 16,
+   "val_motion": 0.004482676740735769,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 17,
+   "val_motion": 0.0048921434208750725,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 18,
+   "val_motion": 0.0041809710673987865,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 19,
+   "val_motion": 0.0034855366684496403,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 20,
+   "val_motion": 0.0052021704614162445,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 21,
+   "val_motion": 0.004124688915908337,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 22,
+   "val_motion": 0.0053252712823450565,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 23,
+   "val_motion": 0.0031016904395073652,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 24,
+   "val_motion": 0.002835680730640888,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 25,
+   "val_motion": 0.004144405014812946,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 26,
+   "val_motion": 0.0037007040809839964,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 27,
+   "val_motion": 0.005140947178006172,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 28,
+   "val_motion": 0.002193224849179387,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 29,
+   "val_motion": 0.002956341253593564,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 30,
+   "val_motion": 0.0026848441921174526,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 31,
+   "val_motion": 0.0025191691238433123,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 32,
+   "val_motion": 0.002227028366178274,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 33,
+   "val_motion": 0.0018787605222314596,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 34,
+   "val_motion": 0.0017295602010563016,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 35,
+   "val_motion": 0.0021493928506970406,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 36,
+   "val_motion": 0.0017591441283002496,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 37,
+   "val_motion": 0.0016180808888748288,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 38,
+   "val_motion": 0.001731585944071412,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 39,
+   "val_motion": 0.0015006622998043895,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 40,
+   "val_motion": 0.001778271864168346,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 41,
+   "val_motion": 0.0014693556586280465,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 42,
+   "val_motion": 0.0013937080511823297,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 43,
+   "val_motion": 0.001192594412714243,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 44,
+   "val_motion": 0.0011953673092648387,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 45,
+   "val_motion": 0.0012905960902571678,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 46,
+   "val_motion": 0.0012196018360555172,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 47,
+   "val_motion": 0.0010660579428076744,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 48,
+   "val_motion": 0.0011011416791006923,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 49,
+   "val_motion": 0.0010656040394678712,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 50,
+   "val_motion": 0.0011113117216154933,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 51,
+   "val_motion": 0.001040003844536841,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 52,
+   "val_motion": 0.0009668695856817067,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 53,
+   "val_motion": 0.0009796215454116464,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 54,
+   "val_motion": 0.0009423906449228525,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 55,
+   "val_motion": 0.000948260654695332,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 56,
+   "val_motion": 0.0009466008632443845,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 57,
+   "val_motion": 0.0009295098716393113,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 58,
+   "val_motion": 0.0009278175421059132,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 59,
+   "val_motion": 0.0009322292171418667,
+   "grounding": 1.0
+  },
+  {
+   "epoch": 60,
+   "val_motion": 0.0009268014109693468,
+   "grounding": 1.0
+  }
+ ]
+}

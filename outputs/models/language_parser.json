@@ -1,0 +1,38 @@
+{
+ "bag_of_words_seed0": {
+  "seen": 0.8454999923706055,
+  "new phrasing": 0.6639999747276306,
+  "new pairing": 1.0,
+  "order only": 0.5174999833106995
+ },
+ "bag_of_words_seed1": {
+  "seen": 0.7914999723434448,
+  "new phrasing": 0.7095000147819519,
+  "new pairing": 1.0,
+  "order only": 0.30649998784065247
+ },
+ "bag_of_words_seed2": {
+  "seen": 0.7229999899864197,
+  "new phrasing": 0.7005000114440918,
+  "new pairing": 1.0,
+  "order only": 0.10000000149011612
+ },
+ "gru_seed0": {
+  "seen": 1.0,
+  "new phrasing": 0.9904999732971191,
+  "new pairing": 1.0,
+  "order only": 1.0
+ },
+ "gru_seed1": {
+  "seen": 1.0,
+  "new phrasing": 0.9860000014305115,
+  "new pairing": 1.0,
+  "order only": 1.0
+ },
+ "gru_seed2": {
+  "seen": 1.0,
+  "new phrasing": 0.9629999995231628,
+  "new pairing": 1.0,
+  "order only": 1.0
+ }
+}

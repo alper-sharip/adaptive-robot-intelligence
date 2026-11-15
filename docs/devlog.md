@@ -301,3 +301,78 @@ results_stage5.md. "Push" was dropped from the curriculum.
 ### Test detail: the action space clips
 The residual-equals-clone test failed on a 0.0001 rad difference: the clone asked for −0.1501 rad
 and the Gymnasium action space clips at −0.15. The test now compares against the clipped clone.
+
+## 2026-11-15: Stage 6 language and task-level autonomy (M19, M20; M21 not attempted)
+
+Built: multi-object scene (3 cubes, 3 targets) that every earlier skill runs in unchanged via
+`focus(cube, target)`; instruction grammar with held-out splits; bag-of-words and GRU parsers;
+a language-conditioned policy trained by behaviour cloning only; a task planner with clause
+splitting, plan validation, post-condition monitoring, bounded retries, a fallback skill and
+fault injection. Results: docs/results_stage6.md.
+
+### Test-design flaw: a held-out split that could not be solved
+First held-out pairs: blue→red and yellow→green. Both parsers: 100% seen, 48.2% new pairing.
+With blue→red absent from training, {red, blue} always meant red→blue, so word order carried no
+information in the training set and neither model learned it. Changed the held-out pairs to
+yellow→green and blue→blue and added an "order only" split (red→blue vs blue→red). After that:
+bag of words 10-52% on order only, GRU 100%. Lesson: before blaming a model for failing a
+generalization test, check that the training data determines the answer.
+
+### Wrong conclusion from one seed: "word order cannot be learned from actions"
+Seed 0 of the language policy reads "on the blue target put the red cube" as blue→red every
+time (grounding 93.5%, later 96.4%), while the same GRU trained as a parser with labels reads it
+correctly. I wrote this up as a finding and reported the end-to-end policy at 108/150 against
+149/150 for parser + skill. Seeds 1 and 2, run to put a number on the variance, scored 144 and
+146 and are 100% correct on the order-only split. The finding was a property of one run. All seven runs are in
+results_stage6.md; the supported statement is "the outcome varies strongly between seeds".
+
+### Negative result, partly explained: pretrained text encoder gives 0% grounding (seed 0)
+Initializing the policy's text encoder from the parser: cube attention correct, target
+attention a consistent wrong assignment, 2/150.
+- Hypothesis 1, saturated attention at initialization. Measured: sentence-vector norm 9.2 vs
+  2.6; initial max attention weight 0.88 vs 0.67. Added LayerNorm on the sentence vector, query
+  weights ×0.1, scale 1: initial max weight 0.40. From-scratch seed 0 improved (93.5% → 96.4%);
+  the pretrained run did not (0%). Rejected as the cause; the change is kept.
+- Hypothesis 2, an unlucky seed. Pretrained seed 1: 100% grounding, 148/150. Confirmed that it
+  is seed-dependent.
+- Observation: in every run the grounding after epoch 1 is within a few points of the final
+  value (95.9 → 96.4, 100 → 100, 97.8 → 100, 0 → 0, 100 → 100).
+- Hypothesis 3, the attention commits before the motion network has learned what the target is
+  for. Test: learning rate ×0.1 for text encoder and attention, same seed 0: 100% grounding,
+  148/150. The same change on from-scratch seed 0: still 96.4%, 124/150. So it fixed the
+  pretrained failure in the one case tried and is not a general cure.
+
+### Finding: imperfect grounding and poor motion come together
+Runs ending at 96% grounding: 23 and 19 motion failures with the right objects. Runs at 100%:
+0, 0, 0, 2. Motion error given the true objects differs by only about 1.4×. Plausibly the 4% of
+samples that feed the motion network the wrong object; not tested directly.
+
+### Training-speed trap: two PyTorch jobs on two cores
+Two training runs in parallel, each with 2 threads on a 2-core machine, ran more than 10× slower
+than one after the other (2.4 min per epoch against 8 s). Run them in sequence.
+
+### Finding: the end-to-end policy can match parser + skill, but not reliably
+M19, 150 episodes: parser + Stage 4 skill 149; end-to-end 108, 144, 146 (three seeds); with a
+pretrained text encoder 2 or 148. Because the attention is inspectable, each failure can be
+attributed to grounding or to motion.
+
+### Bug: fault injector crashed on bumps
+`Faults._free_spot` unpacked `region` even when sampling near a point (`region=None`). Unpack
+only when `near is None`.
+
+### Finding: the learned skill fails just outside its training envelope, twice
+1. bc_dagger failed 3 of 45 first runs in the multi-object scene; all three had a cube 9-10 cm
+   from a target, below the 12 cm minimum of the Stage 4 scenes. The multi-object sampler now
+   enforces `min_separation`.
+2. With faults and monitoring it recovers 43% of faulted tasks (scripted and reactive skills:
+   100%). After a fault the cube lies somewhere the skill never trained on, and retrying the
+   same skill fails the same way. Added `fallback`: learned skill first, classical skill for
+   retries: 100% of faulted tasks recovered.
+
+### Refactor: executors can start mid-episode
+`rollout` split into `run_policy` (run from the current state) and `rollout` (reset + run +
+failure attribution). `ActionExecutor` now initializes its controller from the current joint
+positions and gripper command instead of assuming the home pose. Stage 4/5 tests unchanged.
+
+### M21 (VLA fine-tuning): not attempted
+Needs a GPU and pretrained weights; neither is available in the build environment.
