@@ -225,7 +225,7 @@ python scripts/train_vision.py --demos 200 --epochs 18 --name my_vision   # imag
 python scripts/train_rl.py reach --steps 200000   # RL from scratch (~4 min on 2 cores)
 python scripts/train_rl.py residual --base outputs/models/bc_reactive_100.pt --steps 400000
 python scripts/evaluate_bc.py --joint-interp --disturb outputs/models/rl_residual.pt
-python scripts/train_language.py parser           # instruction parsers (seconds)
+python scripts/train_language.py parser           # instruction parsers (~2 min)
 python scripts/train_language.py policy --seed 2  # language-conditioned policy (~10 min on 2 cores)
 python scripts/evaluate_language.py m19           # one instruction per episode, 3 systems
 python scripts/evaluate_language.py m20           # two-step tasks, with and without faults
