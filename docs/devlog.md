@@ -168,3 +168,54 @@ entered the top-face set (wrecking the rectangle fit for yaw).
 Rendering needs `MUJOCO_GL=egl` on display-less Linux (servers, Colab). `ari/__init__.py`
 now sets it automatically when there is no DISPLAY, and `tests/conftest.py` imports `ari`
 first so it applies before `mujoco` is imported.
+
+## 2026-11-14: Stage 4 imitation learning (M13, M14)
+
+Built: observation/action spaces, demonstration recording, behaviour cloning in PyTorch,
+a state-feedback expert, DAgger, parallel evaluation with a cube-moving disturbance.
+Results: docs/results_stage4.md. Image-based policies (M15) are deferred to a GPU.
+
+### Bug: replaying recorded actions did not reproduce the episode
+Recorded the 100 Hz scripted expert, sampled at 20 Hz; replaying those actions failed to lift
+the cube. Actions are deltas from the MEASURED pose, so the timing difference between a 100 Hz
+command stream and a 20 Hz held command accumulates like an integrator.
+**Fix:** the expert acts through the same 20 Hz executor the learner uses. Replay is now exact
+(regression test).
+
+### Bug: the expert dropped the cube through the 20 Hz interface (2 of 10 episodes)
+Jumping to each new target 20 times a second jolts the stiff joint servos; the ~1 N grip from
+Stage 2 let the cube slide out during the lift (gripper at 10.6 cm, cube at 7.5 cm).
+**Fix:** interpolate the command linearly between decisions (`ActionExecutor`). 30/30 afterwards.
+(This is the weak gripper from Stage 2 again; the stiffness decision is still open.)
+
+### Finding: low validation loss, 18% success
+First policy, cloned from 500 scripted demonstrations: validation MSE 0.027 (normalized), 4/20
+rollouts. Failure traces: crawling at 0.2 mm/step mid-transport; pressing into the table after
+release; flying off to z = 0.8 m.
+**Cause:** the scripted expert is clock-driven (min-jerk timing, fixed pauses). For one observed
+state the data holds many different actions; a memoryless network learns their mean.
+**Fix:** a state-feedback expert (`ReactiveExpert`): action = f(state), no clock. 26/30 at once.
+
+### Finding: hard thresholds in the expert are cliffs for the learner
+Remaining failures all occurred while lowering the cube: the learner drifted 4-8 mm sideways and
+froze. The expert's rule there: within 3 mm "lower", otherwise "climb back to carry height".
+The expert never crossed that threshold itself, so the flaw was invisible in its own 100%.
+**Fix:** continuous "funnel" rules (height target proportional to horizontal error).
+Cloned policy 87% → 100%; the expert also got faster (8.7 → 6.8 s).
+
+### Finding: DAgger's value only shows off-distribution
+500 demos: nominal 100% without DAgger, 97% with (noise). With the cube moved mid-episode:
+68% without, 99% with.
+
+### Negative result: DAgger from a weak policy made it worse
+100 demos: 71% → (DAgger) → 25%. Hypothesis 1: repeated stuck states swamp the data (54% of
+samples were near-duplicates). Tested by removing repeats: 39%. Helps, does not explain.
+Hypothesis 2: look-alike states with opposite labels (pre-grasp hover "down" vs post-place hover
+"up"). The opposite labels are in the data; the predicted pattern in failures is weak (47% vs 32%
+across separation groups, small groups). Left open with a proposed test (results_stage4.md).
+**Lesson:** I had a plausible story after the first measurement and it was wrong. The second story
+is also plausible and is not confirmed. Both are recorded as such.
+
+### Environment: import order again
+`scripts/bc_demo.py` imported `mujoco` before `ari` and lost the headless-renderer setting from
+Stage 3. Scripts that render must import `ari` first.

@@ -25,7 +25,10 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M10 RGB-D camera model | 🧪 Tested | back-projected renderer depth matches geometry to < 0.1 mm |
 | M11 Cube and target localization | 🧪 Tested | cube ~0.3-0.6 mm, target ~1 mm median error |
 | M12 Vision-driven pick-and-place | 🧪 Tested | same success as ground truth under 3 noise levels |
-| Stage 4+ Imitation learning, RL, … | ⬜ Planned | see `docs/roadmap.md` |
+| M13 Demonstrations + state-feedback expert | 🧪 Tested | exact replay; expert 100% nominal and with a moved cube |
+| M14 Behaviour cloning + DAgger (PyTorch) | 🧪 Tested | 100% nominal; 99% with the cube moved mid-episode |
+| M15 Image-based policy (ACT / Diffusion Policy) | ⬜ Planned | needs a GPU |
+| Stage 5+ Reinforcement learning, language, … | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
 
@@ -47,6 +50,26 @@ and RL policies are compared on a fixed, seeded evaluation set.
 Debugging these runs uncovered four simulation issues: friction creep, a friction parameter
 that had no effect, a weak gripper, and an underdamped finger servo. All four are diagnosed in
 [`docs/devlog.md`](docs/devlog.md).
+
+### Imitation learning (Stage 4)
+
+![learned policy recovering](outputs/bc_dagger_seed3_disturbed.gif)
+
+*A learned policy (neural network, 20 Hz). One second in, the cube is moved; the policy re-targets.
+The scripted Stage 2 policy fails this test every time.*
+
+100 evaluation episodes per cell. Full analysis, including a negative result: [`docs/results_stage4.md`](docs/results_stage4.md).
+
+| Policy | Nominal | Cube moved mid-episode |
+|---|---|---|
+| Scripted expert (clock-driven) | 100% | 0% |
+| Reactive expert (state feedback) | 100% | 100% |
+| Cloned from scripted expert, 500 demos | 18% | not run |
+| Cloned from reactive expert, 500 demos | 100% | 68% |
+| + DAgger | 97% | **99%** |
+
+The largest effect came from the choice of expert, not the network: a memoryless policy cannot
+clone a clock-driven expert (18%) but clones a state-feedback one (100%) with identical training.
 
 ### Perception (Stage 3)
 
@@ -115,7 +138,11 @@ python scripts/pick_place_demo.py --wall --policy planned --seed 1   # planning 
 python scripts/evaluate_wall.py --policy planned  # naive vs heuristic vs planned
 python scripts/perception_demo.py --seed 3        # what the camera sees -> outputs/
 python scripts/evaluate_vision.py --scene wall --noise realistic   # vision-driven robot
-pytest                                            # 91 tests
+python scripts/collect_demos.py --expert reactive --n 500          # demonstrations -> data/
+python scripts/train_bc.py --demos data/demos_reactive.npz --dagger-iters 3 --name my_policy
+python scripts/evaluate_bc.py --disturb reactive scripted outputs/models/bc_dagger.pt
+python scripts/bc_demo.py outputs/models/bc_dagger.pt --seed 3 --disturb
+pytest                                            # 107 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
@@ -130,8 +157,9 @@ src/ari/
   control/    joint-space PD control, gravity compensation, Cartesian (IK-based) controller
   planning/   trajectories, collision checking, RRT-Connect, redundancy resolution
   envs/       pick-and-place scene with seeded randomization
+  learning/   observation/action spaces, demonstrations, behaviour cloning, DAgger, evaluation
   perception/ RGB-D camera model, colour + depth localization, noise model, vision-driven policy wrapper
-  skills/     scripted and planned pick-and-place policies, episode runner with failure attribution
+  skills/     scripted, planned and reactive (state-feedback) pick-and-place, episode runner
 scripts/      runnable experiments
 tests/        automated checks (kinematics vs MuJoCo, IK success rate, control behaviour)
 docs/         roadmap, development log, concept notes

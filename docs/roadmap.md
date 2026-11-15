@@ -22,9 +22,9 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🧪 M12 Vision-driven pick-and-place: matches ground-truth success in all 6 conditions (docs/results_stage3.md)
 
 ## Stage 4: Imitation learning
-- ⬜ M13 Demo collection in LeRobotDataset format
-- ⬜ M14 Behaviour cloning (state-based), own PyTorch implementation
-- ⬜ M15 Image-based policy (ACT or Diffusion Policy via LeRobot), compared vs baseline
+- 🧪 M13 Demonstration recording (clock-driven and state-feedback experts); .npz with LeRobot column names (conversion to LeRobotDataset happens in M15)
+- 🧪 M14 Behaviour cloning + DAgger in plain PyTorch: 100% nominal, 99% with the cube moved mid-episode (docs/results_stage4.md)
+- ⬜ M15 Image-based policy (ACT or Diffusion Policy via LeRobot), compared vs baseline: needs a GPU (Colab)
 
 ## Stage 5: Reinforcement learning
 - ⬜ M16 Gymnasium env: reach
