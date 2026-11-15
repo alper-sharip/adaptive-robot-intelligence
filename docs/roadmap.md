@@ -24,7 +24,7 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 ## Stage 4: Imitation learning
 - 🧪 M13 Demonstration recording (clock-driven and state-feedback experts); .npz with LeRobot column names (conversion to LeRobotDataset happens in M15)
 - 🧪 M14 Behaviour cloning + DAgger in plain PyTorch: 100% nominal, 99% with the cube moved mid-episode (docs/results_stage4.md)
-- ⬜ M15 Image-based policy (ACT or Diffusion Policy via LeRobot), compared vs baseline: needs a GPU (Colab)
+- 🟨 M15 Image-based policy: own CNN student 🧪 tested at CPU scale (43% nominal, 4% disturbed; docs/results_m15.md). Full-scale GPU run and LeRobot ACT: scripts and Colab notebook ready, ACT smoke-tested only, not trained
 
 ## Stage 5: Reinforcement learning
 - ⬜ M16 Gymnasium env: reach

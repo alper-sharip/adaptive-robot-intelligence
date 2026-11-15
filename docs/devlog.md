@@ -219,3 +219,43 @@ is also plausible and is not confirmed. Both are recorded as such.
 ### Environment: import order again
 `scripts/bc_demo.py` imported `mujoco` before `ari` and lost the headless-renderer setting from
 Stage 3. Scripts that render must import `ari` first.
+
+## 2026-11-14: M15 learning from images (CPU-scale), and the DAgger question resolved
+
+Built: wrist camera, teacher-student image policy (two small CNNs with spatial softmax),
+image demonstration/DAgger collection, LeRobot ACT script (smoke-tested), Colab notebook.
+Results: docs/results_m15.md.
+
+### Result: the image student grasps but cannot place (43% nominal, 4% with the cube moved)
+It lifts the cube in 95/100 episodes; 45 failures are misplacements. While carrying, the wrist
+camera sees the cube, not the target; the front camera shows the target ~6 px wide. Not fixed here.
+
+### Environment: software rendering is 12× slower with shadows and reflections
+200 ms per 64×64 image by default, 16 ms with both off. Off for the student's images.
+Also an 8× mis-estimate: I budgeted ~4 min per training epoch from a timing taken
+while other jobs were running; uncontended it was ~30 s. Measure on an idle machine.
+
+### The DAgger question from Stage 4: three wrong or partial stories, then a dissection
+Symptom in both the state-based (100 demos) and image policies: DAgger rounds made the policy worse.
+1. *Repeated stuck states swamp the data.* Removing repeats: 25% → 39%. Minor.
+2. *Look-alike states with opposite labels.* Consistent with the data, never confirmed.
+3. *States on the expert's decision cliffs.* Measured: 4.0% of a weak learner's DAgger states vs
+   0.4% of demos. Removing them: still 35%. A real correlation that was not the cause.
+4. **Dissection instead of a fourth guess:** retrained once, found three frozen states, printed
+   the nearest training samples. The policy's motion output was right (≈0) and the state sat a few
+   mm outside the expert's grasp trigger: a precision failure. Training error by configuration:
+   0.0007 (500 demos) / 0.0053 (100) / 0.0079 (100 + DAgger, 40 epochs).
+   Intervention: same data, 200 epochs → error 0.0011, success 48% → 70% (60 episodes).
+   Full rerun with 160 epochs per round: nominal 70%, disturbed 67% (plain cloning: 71% / 47%).
+**Conclusion:** I held the training budget fixed while DAgger made the dataset larger and more
+varied. The fit lost precision, and this task fails below ~3 mm precision at the grasp.
+**Lessons:** (a) three plausible explanations in a row were wrong or minor; only the direct look
+at failing states found it. (b) A correlation that matches the hypothesis (cliffs) is not a cause
+until an intervention says so. (c) When adding data, check that training error has not gone up.
+
+### Negative result that stands: DAgger on the image student
+3 fine-tuning epochs: 23/60 → 1/60. 8 epochs: 24/60 → 2/60. Training error after aggregation
+stayed 5-10× above the pre-DAgger level. Probably the same under-fitting, not shown. Open.
+
+### Bug: training log crashed on a Path argument
+`json.dumps` of the argument dict failed after the model was saved. Fixed with `default=str`.

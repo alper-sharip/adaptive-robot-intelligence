@@ -11,6 +11,7 @@ dependencies = ["mujoco>=3.1", "numpy", "matplotlib", "opencv-python-headless", 
 
 [project.optional-dependencies]
 dev = ["pytest"]
+lerobot = ["lerobot[dataset]"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

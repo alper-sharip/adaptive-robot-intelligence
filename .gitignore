@@ -9,3 +9,4 @@ outputs/models/*
 !outputs/models/bc_dagger.pt
 !outputs/models/bc_dagger.json
 !outputs/models/bc_reactive_500.pt
+!outputs/models/vision_cpu.pt

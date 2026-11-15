@@ -35,8 +35,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ari.learning.spaces import tcp_yaw, wrap
-from ari.skills.pick_place import grasp_yaw
+from ari.learning.spaces import make_obs, wrap
 
 
 @dataclass
@@ -52,15 +51,25 @@ class ReactiveExpert:
     funnel_slope: float = 6.0       # m of height per m of horizontal error
     goal_radius: float = 0.02       # cube this close to the target counts as placed
 
+    half: float = 0.02              # cube half-size (m)
+
     def reset(self) -> None:        # nothing to reset: no memory
         pass
 
     def act(self, env) -> np.ndarray:
-        T = env.tcp_pose()
-        p, yaw, fw = T[:3, 3], tcp_yaw(T), env.finger_width()
-        cube, tgt = env.cube_pose()[:3, 3], env.target_pos()
-        half = env.cfg.cube_half_size
-        size = 2 * half
+        return self.act_from_obs(make_obs(env))
+
+    __call__ = act
+
+    def act_from_obs(self, obs: np.ndarray) -> np.ndarray:
+        """The expert as a pure function of the observation vector (learning/spaces.py).
+        Only the primary entries are read: gripper pose, finger opening, cube pose, target."""
+        p = np.asarray(obs[0:3], dtype=float)
+        yaw, fw = float(np.arctan2(obs[3], obs[4])), float(obs[5])
+        cube = np.asarray(obs[6:9], dtype=float)
+        cube_grasp_yaw = float(np.arctan2(obs[9], obs[10])) / 4.0     # in (-45, 45] deg
+        tgt = np.asarray(obs[11:13], dtype=float)
+        half, size = self.half, 2 * self.half
 
         near_hand = np.linalg.norm(cube - p) < 0.02
         holding = near_hand and fw < size + 0.004          # fingers have closed onto the cube
@@ -81,7 +90,7 @@ class ReactiveExpert:
         elif cube_at_goal:
             goal[2] = self.carry_height                    # task done: back away upward
         else:
-            goal_yaw = grasp_yaw(env.cube_yaw())           # in [-45, 45] deg: the wrist never winds up
+            goal_yaw = cube_grasp_yaw                      # in [-45, 45] deg: the wrist never winds up
             exy = np.linalg.norm(cube[:2] - p[:2])
             eyaw = abs(wrap(goal_yaw - yaw))
             err = max(0.0, exy - self.xy_tol) + 0.03 * max(0.0, eyaw - self.yaw_tol)
@@ -97,4 +106,23 @@ class ReactiveExpert:
         dyaw = float(np.clip(wrap(goal_yaw - yaw), -self.max_yaw_step, self.max_yaw_step))
         return np.array([*d, dyaw, float(closed)], dtype=np.float32)
 
-    __call__ = act
+
+def cliff_score(expert: ReactiveExpert, obs: np.ndarray, eps: float = 0.0015) -> float:
+    """How discontinuous is the expert at this state? Largest change in its motion command (m)
+    when the gripper position, the cube position or the finger opening is nudged by `eps`
+    (1.5 mm); infinity if the gripper command flips.
+
+    Smooth regions score ~eps. A score of centimetres means the state sits on a decision
+    boundary: a 1.5 mm difference in what is observed flips what the expert wants.
+    """
+    base = expert.act_from_obs(obs)
+    worst = 0.0
+    for i in (0, 1, 2, 5, 6, 7, 8):
+        for sign in (-1.0, 1.0):
+            o = np.array(obs, dtype=np.float64)
+            o[i] += sign * eps
+            a = expert.act_from_obs(o)
+            if a[4] != base[4]:
+                return float("inf")
+            worst = max(worst, float(np.linalg.norm(a[:3] - base[:3])))
+    return worst

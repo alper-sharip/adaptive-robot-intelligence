@@ -108,6 +108,12 @@ def build_model(cfg: SceneConfig) -> mujoco.MjModel:
     spec.worldbody.add_camera(name="front_cam", pos=list(cfg.camera_pos),
                               quat=list(look_at_quat(cfg.camera_pos, cfg.camera_target)),
                               fovy=cfg.camera_fovy)
+    # Wrist camera (M15): rides on the hand, beside the fingers, looking past the fingertips.
+    # Positions are in the hand's own frame (z points out of the gripper, fingers open along y).
+    wrist_pos, wrist_target = (0.10, 0.0, 0.045), (0.0, 0.0, 0.15)
+    spec.body("hand").add_camera(name="wrist_cam", pos=list(wrist_pos),
+                                 quat=list(look_at_quat(wrist_pos, wrist_target, up=(-1.0, 0.0, 0.0))),
+                                 fovy=75.0)
     model = spec.compile()
     if cfg.elliptic_cone:
         model.opt.cone = mujoco.mjtCone.mjCONE_ELLIPTIC

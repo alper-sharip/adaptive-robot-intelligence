@@ -67,6 +67,10 @@ Shipped model: `outputs/models/bc_dagger.pt` (500 demos + DAgger).
 
 ## Open question: why did DAgger hurt from 100 demonstrations?
 
+**Update:** resolved in `docs/results_m15.md`. Under-training on the aggregated data was the main cause;
+with 160 epochs per round DAgger gives 70% nominal and 67% disturbed (plain cloning: 71% / 47%).
+The account below is kept as written at the time.
+
 Established:
 - Not caused by repeated stuck states alone. Removing them helped a little (25% → 39%) but the
   policy still degraded; that hypothesis was tested and rejected as the main cause.

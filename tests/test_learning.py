@@ -178,3 +178,23 @@ def test_shipped_policy_picks_and_places_and_recovers(env):
     pol = bc.BCPolicy.load(path)
     assert demos.rollout(env, pol, 3).success
     assert demos.rollout(env, pol, 3, disturbance=CubeShift(3)).success
+
+
+def test_expert_from_obs_matches_expert_from_env(env):
+    ex = ReactiveExpert()
+    env.reset(7)
+    assert np.array_equal(ex(env), ex.act_from_obs(make_obs(env)))
+
+
+def test_cliff_score_is_small_in_free_space_and_large_at_the_grasp_trigger(env):
+    from ari.skills.reactive_pick_place import cliff_score
+
+    ex = ReactiveExpert()
+    env.reset(7)
+    o = make_obs(env)
+    assert cliff_score(ex, o) < 0.004                 # far from everything: smooth
+    o2 = o.copy()
+    o2[0:3] = o[6:9] + [0.0, 0.0, 0.004]              # gripper exactly at the grasp-trigger height
+    g = np.arctan2(o[9], o[10]) / 4
+    o2[3:5] = [np.sin(g), np.cos(g)]                  # ...and aligned with the cube
+    assert cliff_score(ex, o2) == float("inf")        # a 1.5 mm nudge flips open/closed

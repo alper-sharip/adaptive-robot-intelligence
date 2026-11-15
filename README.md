@@ -27,7 +27,8 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M12 Vision-driven pick-and-place | 🧪 Tested | same success as ground truth under 3 noise levels |
 | M13 Demonstrations + state-feedback expert | 🧪 Tested | exact replay; expert 100% nominal and with a moved cube |
 | M14 Behaviour cloning + DAgger (PyTorch) | 🧪 Tested | 100% nominal; 99% with the cube moved mid-episode |
-| M15 Image-based policy (ACT / Diffusion Policy) | ⬜ Planned | needs a GPU |
+| M15 Image-based policy (own CNN, teacher-student) | 🧪 Tested at CPU scale | 43% from two 64×64 cameras; grasps 95/100, placing is the weak point |
+| M15 at full scale; LeRobot ACT | 🟨 Scripts + Colab notebook ready | ACT smoke-tested only; no trained ACT policy yet |
 | Stage 5+ Reinforcement learning, language, … | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
@@ -70,6 +71,22 @@ The scripted Stage 2 policy fails this test every time.*
 
 The largest effect came from the choice of expert, not the network: a memoryless policy cannot
 clone a clock-driven expert (18%) but clones a state-feedback one (100%) with identical training.
+
+### Learning from images (M15, CPU-scale)
+
+![image policy](outputs/vision_cpu_demo.gif)
+
+*This policy sees only two 64×64 camera images and its own gripper pose.*
+
+| Policy | Input | Nominal | Cube moved |
+|---|---|---|---|
+| Stage 4 clone, 500 demos | simulator state | 100% | 68% |
+| Image student, 200 demos, no GPU | 2 cameras | 43% | 4% |
+
+It lifts the cube in 95 of 100 episodes and mostly fails at placing; it does not yet adapt to a
+moved cube. Trained on 2 CPU cores; [`notebooks/m15_vision_policy_colab.ipynb`](notebooks/m15_vision_policy_colab.ipynb)
+runs the same scripts on a GPU. Details, including how the Stage 4 DAgger puzzle was resolved:
+[`docs/results_m15.md`](docs/results_m15.md).
 
 ### Perception (Stage 3)
 
@@ -142,7 +159,8 @@ python scripts/collect_demos.py --expert reactive --n 500          # demonstrati
 python scripts/train_bc.py --demos data/demos_reactive.npz --dagger-iters 3 --name my_policy
 python scripts/evaluate_bc.py --disturb reactive scripted outputs/models/bc_dagger.pt
 python scripts/bc_demo.py outputs/models/bc_dagger.pt --seed 3 --disturb
-pytest                                            # 107 tests
+python scripts/train_vision.py --demos 200 --epochs 18 --name my_vision   # image policy (CPU ok)
+pytest                                            # 117 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.

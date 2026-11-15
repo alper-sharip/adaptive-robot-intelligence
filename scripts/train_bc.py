@@ -28,8 +28,14 @@ if __name__ == "__main__":
     p.add_argument("--epochs", type=int, default=40)
     p.add_argument("--dagger-iters", type=int, default=0)
     p.add_argument("--dagger-episodes", type=int, default=100, help="learner rollouts per DAgger iteration")
+    p.add_argument("--dagger-epochs", type=int, default=None,
+                   help="epochs for retraining after each DAgger iteration (default: same as --epochs). "
+                        "The aggregated data is larger and more varied; with a fixed budget the fit "
+                        "gets less precise and success can DROP (docs/devlog.md)")
     p.add_argument("--keep-repeats", action="store_true",
                    help="keep repeated stuck states in DAgger data (the first, harmful version)")
+    p.add_argument("--keep-cliffs", action="store_true",
+                   help="keep DAgger states where the expert's action is discontinuous (harmful: see devlog)")
     p.add_argument("--name", type=str, required=True)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--workers", type=int, default=2)
@@ -41,9 +47,9 @@ if __name__ == "__main__":
     out = Path("outputs/models") / f"{args.name}.pt"
     log = {"args": {k: str(v) for k, v in vars(args).items()}, "stages": []}
 
-    def fit(tag):
-        print(f"[{tag}] training on {n_eps} episodes, {len(data['action'])} samples")
-        policy, cfg = bc.train(data, bc.TrainConfig(epochs=args.epochs, seed=args.seed))
+    def fit(tag, epochs=args.epochs):
+        print(f"[{tag}] training on {n_eps} episodes, {len(data['action'])} samples, {epochs} epochs")
+        policy, cfg = bc.train(data, bc.TrainConfig(epochs=epochs, seed=args.seed))
         policy.save(out)
         log["stages"].append({"tag": tag, "episodes": int(n_eps), "samples": int(len(data["action"])),
                               "final": cfg.history[-1], "history": cfg.history})
@@ -51,7 +57,8 @@ if __name__ == "__main__":
     fit("bc")
     for it in range(1, args.dagger_iters + 1):
         seeds = range(20_000 + (it - 1) * args.dagger_episodes, 20_000 + it * args.dagger_episodes)
-        O, A, ok = dagger_collect(str(out), seeds, workers=args.workers, dedupe=not args.keep_repeats)
+        O, A, ok = dagger_collect(str(out), seeds, workers=args.workers, dedupe=not args.keep_repeats,
+                                  drop_cliffs=not args.keep_cliffs)
         print(f"[dagger {it}] learner succeeded on {ok}/{len(O)} rollouts; "
               f"adding {sum(len(o) for o in O)} expert-labelled states")
         log["stages"].append({"tag": f"dagger{it}_rollouts", "learner_success": ok / len(O)})
@@ -60,6 +67,6 @@ if __name__ == "__main__":
             data["action"] = np.concatenate([data["action"], a])
             data["episode_index"] = np.concatenate([data["episode_index"], np.full(len(o), n_eps)])
             n_eps += 1
-        fit(f"dagger{it}")
+        fit(f"dagger{it}", args.dagger_epochs or args.epochs)
     out.with_suffix(".json").write_text(json.dumps(log, indent=1))
     print(f"saved {out}")
