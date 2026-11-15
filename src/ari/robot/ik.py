@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ari.robot.kinematics import tcp_jacobian, tcp_pose
+from ari.robot.kinematics import tcp_pose, tcp_pose_and_jacobian
 from ari.robot.transforms import rot_to_axis_angle
 
 # Panda joint limits (rad), identical to the Menagerie model's.
@@ -68,12 +68,12 @@ def solve_ik(
     """Damped-least-squares IK for the Panda TCP. Experiment with the keyword arguments."""
     q = np.array(q_init, dtype=float)
     for it in range(1, max_iters + 1):
-        e = pose_error(T_target, tcp_pose(q))
+        T, J = tcp_pose_and_jacobian(q)
+        e = pose_error(T_target, T)
         pos_err, rot_err = np.linalg.norm(e[:3]), np.linalg.norm(e[3:])
         if pos_err < pos_tol and rot_err < rot_tol:
             return IKResult(q, True, it, pos_err, rot_err)
 
-        J = tcp_jacobian(q)
         JJt = J @ J.T + damping**2 * np.eye(6)
         dq = J.T @ np.linalg.solve(JJt, e)
 

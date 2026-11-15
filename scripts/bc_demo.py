@@ -21,6 +21,7 @@ p.add_argument("policy", help='"scripted", "reactive", or a .pt file')
 p.add_argument("--seed", type=int, default=3)
 p.add_argument("--disturb", action="store_true")
 p.add_argument("--max-time", type=float, default=14.0)
+p.add_argument("--joint-interp", action="store_true", help="executor used by RL policies (Stage 5)")
 p.add_argument("--out", type=Path, default=None)
 args = p.parse_args()
 
@@ -40,7 +41,8 @@ def on_frame(env):
 
 
 res = demos.rollout(env, policy, args.seed, max_time=args.max_time,
-                    disturbance=CubeShift(args.seed) if args.disturb else None, frame_callback=on_frame)
+                    disturbance=CubeShift(args.seed) if args.disturb else None, frame_callback=on_frame,
+                    joint_interp=args.joint_interp)
 print(f"{args.policy} seed {args.seed}{' (cube moved at 1 s)' if args.disturb else ''}: "
       f"success={res.success} {res.failure} placement error {1000 * res.placement_error:.1f} mm, {res.duration:.1f} s")
 name = Path(args.policy).stem + f"_seed{args.seed}" + ("_disturbed" if args.disturb else "")

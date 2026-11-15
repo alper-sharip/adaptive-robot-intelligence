@@ -259,3 +259,45 @@ stayed 5-10× above the pre-DAgger level. Probably the same under-fitting, not s
 
 ### Bug: training log crashed on a Path argument
 `json.dumps` of the argument dict failed after the model was saved. Fixed with `default=str`.
+
+## 2026-11-14: Stage 5 reinforcement learning (M16, M17, M18)
+
+Built: Gymnasium environments (reach, pick-and-place) with potential-based shaping, PPO from
+scratch with persistent worker processes, residual policy on the frozen clone, RL evaluation
+through the Stage 4 harness, learning-curve plot. Results: docs/results_stage5.md.
+
+### Performance: the simulator was too slow for RL, and 95% of the time was my own IK
+123 policy steps/s; profiling showed `solve_ik` (pure-Python DH chain, 5 solves per decision).
+Closed-form DH link transforms and one pass for pose + Jacobian: 262 steps/s. IK once per
+decision with joint-space interpolation: 634 steps/s per core. Kinematics tests (FK and Jacobian
+against MuJoCo) guard the rewrite. Baselines re-measured under the new executor (clone 71% → 66%,
+within noise).
+
+### PPO verified before use
+Pendulum-v1: about −1100 → about −200 in 150k steps. Only then pointed at the robot.
+
+### Finding: exploration noise alone raised the clone from 66% to 79%
+First residual iterations (critic warm-up, policy frozen) already showed ~82% training success.
+The clone's failures are stalls a few mm from the grasp trigger; 1.5 mm of jitter breaks them.
+A "noise, no learning" baseline was added to the evaluation; it accounts for half of RL's gain.
+
+### Finding: reward specification shows up in the result
+Residual RL made placement less accurate (4 mm → 9-12 mm) while raising success and speed. The
+reward is flat inside the 3 cm target zone and charges per step.
+
+### Reward bug: idle income under potential-based shaping
+With γ = 0.99, a step that changes nothing earns γΦ − Φ = −0.01·Φ. My Φ was negative (around −1),
+so standing still paid about +0.01 per step, cancelling the −0.01 time penalty. The theory
+(policy invariance) is intact; the learning signal is not. Fix: offset Φ to be non-negative.
+Did NOT rescue from-scratch pick-and-place (still 0%), so it was a real flaw but not the cause.
+The residual results were trained with the original reward; the offset is an option, default off,
+so they stay reproducible.
+
+### Negative result: pick-and-place from scratch, 0% in 600k and 500k steps
+The policy does not even approach the cube (closest approach ~30-34 cm), although the reach task
+is learned in 150k steps with the same PPO. Cause not established; candidates listed in
+results_stage5.md. "Push" was dropped from the curriculum.
+
+### Test detail: the action space clips
+The residual-equals-clone test failed on a 0.0001 rad difference: the clone asked for −0.1501 rad
+and the Gymnasium action space clips at −0.15. The test now compares against the clipped clone.

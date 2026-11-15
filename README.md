@@ -29,7 +29,10 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M14 Behaviour cloning + DAgger (PyTorch) | 🧪 Tested | 100% nominal; 99% with the cube moved mid-episode |
 | M15 Image-based policy (own CNN, teacher-student) | 🧪 Tested at CPU scale | 43% from two 64×64 cameras; grasps 95/100, placing is the weak point |
 | M15 at full scale; LeRobot ACT | 🟨 Scripts + Colab notebook ready | ACT smoke-tested only; no trained ACT policy yet |
-| Stage 5+ Reinforcement learning, language, … | ⬜ Planned | see `docs/roadmap.md` |
+| M16 Gymnasium environments | 🧪 Tested | `check_env` passes; shaping reward telescopes |
+| M17 PPO from scratch | 🧪 Tested | verified on Pendulum-v1; reach 100% (3 seeds); pick-and-place from scratch 0% |
+| M18 Residual RL on the cloned policy | 🧪 Tested | 66% → 92-93% (2 seeds) |
+| Stage 6+ Language, benchmark, report | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
 
@@ -71,6 +74,25 @@ The scripted Stage 2 policy fails this test every time.*
 
 The largest effect came from the choice of expert, not the network: a memoryless policy cannot
 clone a clock-driven expert (18%) but clones a state-feedback one (100%) with identical training.
+
+### Reinforcement learning (Stage 5)
+
+![learning curves](outputs/rl_learning_curves.png)
+
+PPO written from scratch, checked on a standard benchmark first. 100 evaluation episodes per cell.
+Full analysis: [`docs/results_stage5.md`](docs/results_stage5.md).
+
+| Policy (from 100 demonstrations) | Nominal | Cube moved |
+|---|---|---|
+| Cloned policy | 66% | 43% |
+| Cloned policy + exploration noise, no learning | 79% | 51% |
+| Cloned policy + residual RL | 92-93% (2 seeds) | 64-73% |
+
+- Reaching a point is learned from scratch in ~150k steps and matches a proportional controller.
+- Pick-and-place from scratch did not work (0% in 600k steps).
+- Half of the residual policy's gain is exploration noise freeing the clone from small stalls;
+  the noise-only baseline is what separates that from learning.
+- RL traded placement accuracy (4 mm → 10 mm) for speed and success, as the reward allowed.
 
 ### Learning from images (M15, CPU-scale)
 
@@ -160,7 +182,10 @@ python scripts/train_bc.py --demos data/demos_reactive.npz --dagger-iters 3 --na
 python scripts/evaluate_bc.py --disturb reactive scripted outputs/models/bc_dagger.pt
 python scripts/bc_demo.py outputs/models/bc_dagger.pt --seed 3 --disturb
 python scripts/train_vision.py --demos 200 --epochs 18 --name my_vision   # image policy (CPU ok)
-pytest                                            # 117 tests
+python scripts/train_rl.py reach --steps 200000   # RL from scratch (~4 min on 2 cores)
+python scripts/train_rl.py residual --base outputs/models/bc_reactive_100.pt --steps 400000
+python scripts/evaluate_bc.py --joint-interp --disturb outputs/models/rl_residual.pt
+pytest                                            # 129 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
@@ -175,6 +200,7 @@ src/ari/
   control/    joint-space PD control, gravity compensation, Cartesian (IK-based) controller
   planning/   trajectories, collision checking, RRT-Connect, redundancy resolution
   envs/       pick-and-place scene with seeded randomization
+  rl/         PPO, task builders, residual policy
   learning/   observation/action spaces, demonstrations, behaviour cloning, DAgger, evaluation
   perception/ RGB-D camera model, colour + depth localization, noise model, vision-driven policy wrapper
   skills/     scripted, planned and reactive (state-feedback) pick-and-place, episode runner

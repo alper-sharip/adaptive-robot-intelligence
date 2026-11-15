@@ -41,6 +41,8 @@ class ScriptedAsPolicy:
 
 
 def make_policy(spec: str, env):
+    noisy = spec.endswith("#noisy")          # RL policies only: keep the exploration noise
+    spec = spec.removesuffix("#noisy")
     if spec == "scripted":
         return ScriptedAsPolicy(env)
     if spec == "reactive":
@@ -48,10 +50,15 @@ def make_policy(spec: str, env):
         return lambda obs: ex(env)
     import torch
 
-    if torch.load(spec, weights_only=True).get("kind") == "vision":
+    kind = torch.load(spec, weights_only=True).get("kind")
+    if kind == "vision":
         from ari.learning import vision
 
         return vision.ImagePolicy(env, *vision.load(spec))
+    if kind in ("residual", "ppo_pick"):
+        from ari.rl import tasks
+
+        return tasks.AsRolloutPolicy(tasks.load(spec), noisy=noisy)
     from ari.learning.bc import BCPolicy
 
     return BCPolicy.load(spec)
@@ -84,13 +91,14 @@ class CubeShift:
 
 
 def _eval_chunk(args):
-    spec, seeds, disturb, max_time = args
+    spec, seeds, disturb, max_time, joint_interp = args
     import torch
 
     torch.set_num_threads(1)
+    torch.manual_seed(seeds[0] if seeds else 0)
     env = PickPlaceEnv()
     policy = make_policy(spec, env)
-    return [demos.rollout(env, policy, s, max_time=max_time,
+    return [demos.rollout(env, policy, s, max_time=max_time, joint_interp=joint_interp,
                           disturbance=CubeShift(s) if disturb else None) for s in seeds]
 
 
@@ -147,10 +155,13 @@ def _pmap(fn, jobs, workers):
         return pool.map(fn, jobs)
 
 
-def evaluate(spec: str, seeds=range(100), disturb: bool = False, workers: int = 2, max_time: float = 25.0):
+def evaluate(spec: str, seeds=range(100), disturb: bool = False, workers: int = 2, max_time: float = 25.0,
+             joint_interp: bool = False):
+    """joint_interp: use the faster action executor that RL policies are trained with (Stage 5)."""
     seeds = list(seeds)
     chunks = [seeds[i::workers * 2] for i in range(workers * 2)]
-    results = [r for c in _pmap(_eval_chunk, [(spec, c, disturb, max_time) for c in chunks], workers) for r in c]
+    results = [r for c in _pmap(_eval_chunk, [(spec, c, disturb, max_time, joint_interp) for c in chunks], workers)
+               for r in c]
     results.sort(key=lambda r: r.seed)
     n, k = len(results), sum(r.success for r in results)
     p, z = k / n, 1.96

@@ -33,16 +33,30 @@ class ActionExecutor:
     Both demonstration recording and policy rollouts go through this one class.
     """
 
-    def __init__(self, env: PickPlaceEnv):
+    def __init__(self, env: PickPlaceEnv, joint_interp: bool = False):
+        """joint_interp=False: interpolate the Cartesian target, IK at every 100 Hz tick
+        (Stage 4 behaviour). joint_interp=True: IK once per decision, interpolate the joint
+        command. 5x fewer IK solves; used for reinforcement learning, where simulation
+        speed decides what is feasible."""
         self.env = env
         self.ctrl = CartesianController(env.model, env.data)
         self.ctrl.reset()
         self.every = int(round(POLICY_DT / self.ctrl.control_dt))
         self.prev = env.tcp_pose().copy()
+        self.joint_interp = joint_interp
 
     def step(self, action: np.ndarray) -> None:
         T_new, closed = target_from_action(self.env.tcp_pose(), action)
         self.ctrl.set_gripper(closed)
+        if self.joint_interp:
+            q0 = self.ctrl.q_cmd.copy()
+            self.ctrl.set_pose_target(T_new)
+            q1 = self.ctrl.q_cmd.copy()
+            for i in range(1, self.every + 1):
+                self.ctrl.set_joint_target(q0 + (q1 - q0) * i / self.every)
+                self.ctrl.step()
+            self.prev = T_new
+            return
         y0, y1 = tcp_yaw(self.prev), tcp_yaw(T_new)
         for i in range(1, self.every + 1):
             f = i / self.every
@@ -147,7 +161,7 @@ class RolloutResult:
 
 
 def rollout(env: PickPlaceEnv, policy, seed: int, max_time: float = 25.0, disturbance=None,
-            frame_callback=None) -> RolloutResult:
+            frame_callback=None, joint_interp: bool = False) -> RolloutResult:
     """Run a learned (or any obs->action) policy closed-loop for one seeded episode.
 
     policy: callable obs -> action (5,), with an optional .reset().
@@ -155,7 +169,7 @@ def rollout(env: PickPlaceEnv, policy, seed: int, max_time: float = 25.0, distur
     Success = cube resting in the target zone, gripper open, held for 0.5 s.
     """
     env.reset(seed)
-    ex = ActionExecutor(env)
+    ex = ActionExecutor(env, joint_interp=joint_interp)
     if hasattr(policy, "reset"):
         policy.reset()
     half = env.cfg.cube_half_size

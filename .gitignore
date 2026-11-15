@@ -10,3 +10,7 @@ outputs/models/*
 !outputs/models/bc_dagger.json
 !outputs/models/bc_reactive_500.pt
 !outputs/models/vision_cpu.pt
+!outputs/models/rl_residual.pt
+!outputs/models/rl_residual.json
+!outputs/models/rl_reach.pt
+!outputs/models/bc_reactive_100.pt

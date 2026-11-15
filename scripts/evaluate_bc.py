@@ -17,6 +17,8 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("policies", nargs="+", help='"scripted", "reactive", or a .pt file')
     p.add_argument("--disturb", action="store_true")
+    p.add_argument("--joint-interp", action="store_true",
+                   help="faster action executor used for RL training (Stage 5); keys get a '|ji' suffix")
     p.add_argument("--n", type=int, default=100)
     p.add_argument("--workers", type=int, default=2)
     p.add_argument("--out", type=Path, default=Path("outputs/eval/bc_results.json"))
@@ -25,7 +27,7 @@ if __name__ == "__main__":
     args.out.parent.mkdir(parents=True, exist_ok=True)
     store = json.loads(args.out.read_text()) if args.out.exists() else {}
     for spec in args.policies:
-        r = evaluate(spec, range(args.n), disturb=args.disturb, workers=args.workers)
+        r = evaluate(spec, range(args.n), disturb=args.disturb, workers=args.workers, joint_interp=args.joint_interp)
         print(summary_line(r), flush=True)
-        store[f"{spec}|{'disturbed' if args.disturb else 'nominal'}"] = r
+        store[f"{spec}|{'disturbed' if args.disturb else 'nominal'}" + ("|ji" if args.joint_interp else "")] = r
         args.out.write_text(json.dumps(store, indent=1))

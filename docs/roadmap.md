@@ -27,9 +27,9 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🟨 M15 Image-based policy: own CNN student 🧪 tested at CPU scale (43% nominal, 4% disturbed; docs/results_m15.md). Full-scale GPU run and LeRobot ACT: scripts and Colab notebook ready, ACT smoke-tested only, not trained
 
 ## Stage 5: Reinforcement learning
-- ⬜ M16 Gymnasium env: reach
-- ⬜ M17 PPO/SAC: reach → push → pick
-- ⬜ M18 Residual RL on top of BC
+- 🧪 M16 Gymnasium environments (reach, pick-and-place), potential-based shaping, `check_env` passes
+- 🧪 M17 Own PPO (verified on Pendulum-v1): reach from scratch 100% (3 seeds); pick-and-place from scratch 0% (negative result); push not attempted
+- 🧪 M18 Residual RL on the 100-demo clone: 66% → 92-93% nominal (2 seeds), 43% → 64-73% disturbed (docs/results_stage5.md)
 
 ## Stage 6: Autonomous intelligence
 - ⬜ M19 Language-conditioned policy
