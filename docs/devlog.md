@@ -376,3 +376,63 @@ positions and gripper command instead of assuming the home pose. Stage 4/5 tests
 
 ### M21 (VLA fine-tuning): not attempted
 Needs a GPU and pretrained weights; neither is available in the build environment.
+
+## 2026-11-15: Stage 7 benchmark, report, demo video (M22, M23)
+
+Built: `benchmark.py` (13 conditions, sensing errors, latency, out-of-area starts, severity
+sweeps), `scripts/benchmark.py` (resumable runner), `scripts/benchmark_report.py` (heatmap,
+sweeps, tables), `scripts/make_demo_video.py` (the demo rendered from live episodes),
+`docs/report.md`. Results: docs/results_stage7.md.
+
+### Design: where to inject sensing errors
+Every policy reads the cube through `env.cube_pose()` (directly, or via the observation
+vector), while success, failure attribution and the cube-shift disturbance read the simulator
+state directly. Overriding that one method perturbs what all six policies perceive without
+touching how they are judged. A test checks both halves.
+
+### Design: condition strengths were fixed before the full run, by physics where possible
+A 20-episode probe with two policies was used to check that each condition does what it says.
+It showed that a 0.2 kg cube is exactly at the gripper's limit (2 x friction x 1 N = 2 N against
+1.96 N: 0/20), the same phenomenon as friction 0.5. Keeping both would have spent two columns on
+one fact, so the mass condition was set to 0.15 kg and the 0.2 kg result is reported as a
+footnote (0/100 for two policies).
+
+### Finding: the reactive policy had the cube size written into it
+5 cm cube: 0/100. `ReactiveExpert.half = 0.02` is a constant, and "holding" is decided from the
+finger opening against it. Told the size: 100/100. I wrote that policy in Stage 4 and tested it
+only on 4 cm cubes; the benchmark found the assumption in its first run.
+
+### Finding: the clone beats its teacher on that same cube; DAgger does not
+500-demo clone 78%, DAgger clone 8% (it lifts and never releases), teacher 0%.
+
+### Finding, then design flaw: latency and the relative action interface
+100 ms of latency cost every learned policy 26-44 points and the hand-written ones nothing. I
+first logged this as "cause not established". The sweep then showed the hand-written policies
+collapsing too, at 200 ms (scripted 11%, reactive 44%), which an open-loop trajectory should
+not do under a uniform delay. That pointed at the interface: an action is a step relative to
+the pose measured when it is APPLIED, so a late step is added to a pose the policy never saw
+and the target overshoots by the distance travelled during the delay. Test: same delay, late
+actions keep their original pose target. Result: all six policies back at their undelayed level
+at both 100 and 200 ms. The Stage 4 decision ("relative to the measured pose, so the servo lag
+cancels") assumed measurement and action happen at the same instant. Not changed in the
+default interface (every trained model depends on it); recorded as the first thing to fix.
+
+### Finding: the image policy does not extrapolate
+5 cm outside its demonstration area: 7% (nominal 42%); the state-based 500-demo clone loses 8
+points there.
+
+### Process mistakes while running the benchmark
+Two background jobs writing the same results file would have overwritten each other's cells;
+the second was restarted with its own output file and merged (the four cells run twice gave
+identical counts). A "wait until the other job ends" loop matched its own command line and
+never ended; 12 minutes lost.
+
+### Video: two rendering problems
+The software renderer draws striped artefacts at the edge of the shadow map at 1280x720;
+changing shadow clip, scale and scene extent did not remove them, so shadows are off in the
+video. And the task planner's `go_home` calls the frame callback at the 100 Hz control rate
+while skills call it at 20 Hz, which would have played the return-to-home motion five times too
+slowly; frames are now taken by simulated time (one per 50 ms), whoever calls.
+
+### Not done
+ROS 2 wrapper; M21 (VLA); full-scale image policy. Listed in docs/report.md section 7.

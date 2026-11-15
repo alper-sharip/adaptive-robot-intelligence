@@ -1,12 +1,89 @@
 # Adaptive Robot Intelligence
 
-An autonomous robotic manipulation system built in simulation, from first principles up:
-kinematics and control → motion planning → perception → imitation learning →
-reinforcement learning → language-conditioned behaviour.
+A robot manipulation stack built in simulation from the kinematics up, on a laptop-class
+machine with no GPU and no robot hardware: control → motion planning → perception → imitation
+learning → reinforcement learning → language-conditioned behaviour → one benchmark for all of it.
 
-**Minimum viable system (target):** a simulated Franka Panda picks a cube from a random
-position using only camera input and places it in a target zone. Scripted, imitation-learned
-and RL policies are compared on a fixed, seeded evaluation set.
+![demo](outputs/demo_teaser.gif)
+
+*The robot follows a typed two-step instruction while cubes are knocked out of place; it checks
+its own results and redoes what failed. Full 75-second demo: [`outputs/demo.mp4`](outputs/demo.mp4) ·
+Final report: [`docs/report.md`](docs/report.md)*
+
+## Results at a glance
+
+Every number comes from a script in this repository run on fixed seeds, with 95% confidence
+intervals in the linked results. Failures and wrong turns are documented next to the successes
+([what did not work](docs/report.md#4-what-did-not-work-and-what-i-got-wrong)).
+
+| Capability | Result |
+|---|---|
+| Kinematics written from the DH parameters | FK equals MuJoCo to 1e-9 m; IK solves 100/100 targets, mean error 0.05 mm |
+| Scripted pick-and-place | 100/100 seeded episodes |
+| Collision-aware planning (RRT-Connect) over a random wall | 96% with zero contacts, against 60% for a hand-written heuristic |
+| Perception from one RGB-D image | cube located to 0.3-0.6 mm; vision-driven success equals ground truth |
+| Behaviour cloning + DAgger | 97% nominal, 99% with the cube moved mid-episode |
+| Policy from two 64×64 camera images, trained on CPU | 43% (grasps in 95 of 100; placing is the weak point) |
+| Reinforcement learning (own PPO) as a residual on a weak clone | 66% → 92-93% |
+| Following typed instructions among 3 cubes and 3 targets | 149/150 with parser + skill; 108-146/150 end-to-end over three seeds |
+| Two-step tasks with injected faults | 95% with result checking and a fallback skill; 35-45% without |
+| Generalization benchmark: 6 policies × 13 conditions × 100 episodes | no policy is best everywhere (below) |
+
+**Minimum viable system, as defined at the start:** pick a cube from a random position using
+only camera input, place it in a target zone, and compare scripted, imitation-learned and RL
+policies on a fixed seeded set. **Partly reached:** camera-only pick-and-place works with the
+classical camera pipeline driving the scripted policy (100/100, Stage 3); the three kinds of
+policy are compared on fixed seeds below, but on simulator state, not camera input; the policy
+learned directly from pixels is at 43%.
+
+## Generalization benchmark (Stage 7)
+
+![benchmark](outputs/benchmark_heatmap.png)
+
+Each policy runs the same 100 episodes under 13 conditions it was not trained on. Analysis,
+severity sweeps and limits: [`docs/results_stage7.md`](docs/results_stage7.md).
+
+- **No policy is best everywhere.** Three tie at 85% on average and fail in entirely different
+  columns; the average is a summary of this table, not a ranking.
+- **Hand-written policies fail completely on the one thing they assume** (cube moved: 0%; cube
+  size, a constant in the reactive policy's code: 0%). Learned policies lose a little almost
+  everywhere.
+- **A clone can beat its teacher:** the 500-demo clone scores 78% against 0% on the 5 cm cube,
+  and 100% against 1% under 5 mm sensing jitter.
+- **Latency exposed a flaw in my own action interface.** Steps are relative to the pose measured
+  when the action is applied, so 100 ms of delay cost the learned policies 26-44 points. Keeping
+  the original pose target under the same delay restored every policy
+  ([details](docs/results_stage7.md)).
+- **Friction 0.5 is a hardware limit:** the gripper's 1 N per finger cannot hold the cube, for
+  any policy. A stiffer gripper restores them.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    T["Typed instruction"] --> PR["Parser (GRU)"] --> PL["Task planner<br/>validate · monitor · retry"]
+    CAM["RGB-D camera"] --> LOC["Colour + depth<br/>localization"]
+    PL --> SK
+    LOC -. "object poses (Stage 3 policies)" .-> SK
+    SIM -. "object poses (learned policies)" .-> SK
+    subgraph SK["Skills: one interface, 20 Hz"]
+        direction TB
+        S1["Scripted"]
+        S2["Planned (RRT-Connect)"]
+        S3["Reactive feedback"]
+        S4["Cloned (BC, DAgger)"]
+        S5["Clone + residual RL"]
+        S6["Image policy (CNN)"]
+    end
+    SK --> EX["Action executor<br/>relative pose steps"] --> IK["Cartesian controller<br/>own IK, 100 Hz"] --> PD["Joint PD +<br/>gravity feedforward"] --> SIM["MuJoCo<br/>Franka Panda"]
+    SIM --> CAM
+```
+
+Written from scratch here: forward kinematics, Jacobian and IK; the controllers; RRT-Connect and
+the collision checks around MuJoCo's distance queries; the camera model and localization;
+behaviour cloning, DAgger and the image policy; PPO; the instruction grammar, parsers,
+language policy and task planner; all evaluation. Used as libraries: MuJoCo (physics,
+rendering), PyTorch (autograd), NumPy, OpenCV, the Gymnasium interface.
 
 ## Status
 
@@ -35,11 +112,13 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M19 Instruction following (parser + skill; end-to-end language policy) | 🧪 Tested | 149/150 modular; end-to-end 108, 144, 146 of 150 over three seeds |
 | M20 Task planner: validation, monitoring, recovery | 🧪 Tested | 95% of two-step tasks with injected faults (35-45% without monitoring) |
 | M21 Vision-language-action fine-tuning | ⬜ Not attempted | needs a GPU and pretrained weights |
-| Stage 7 Benchmark, report | ⬜ Planned | see `docs/roadmap.md` |
+| M22 Generalization benchmark | 🧪 Tested | 6 policies × 13 conditions × 100 episodes; `tests/test_benchmark.py` |
+| M23 Final report, demo video | ✅ Implemented | `docs/report.md`, `outputs/demo.mp4` (rendered from live simulation by `scripts/make_demo_video.py`) |
+| ROS 2 wrapper (optional) | ⬜ Not done | no engineering need in a single-process simulation |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
 
-## Results so far
+## Results by stage
 
 ### Scripted pick-and-place (Stage 2)
 
@@ -231,7 +310,10 @@ python scripts/evaluate_language.py m19           # one instruction per episode,
 python scripts/evaluate_language.py m20           # two-step tasks, with and without faults
 python scripts/language_demo.py "put the red cube on the green target, then move the yellow cube to the blue target"
 python scripts/language_demo.py --seed 7 --faults # recovery demo -> GIF
-pytest                                            # 149 tests
+python scripts/benchmark.py                       # generalization benchmark (~40 min on 2 cores)
+python scripts/benchmark_report.py                # heatmap, sweeps, tables
+python scripts/make_demo_video.py                 # outputs/demo.mp4 from live simulation (needs ffmpeg)
+pytest                                            # 157 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
@@ -248,6 +330,7 @@ src/ari/
   envs/       pick-and-place scene with seeded randomization; multi-object scene; Gymnasium wrappers
   language/   instruction grammar, parsers, language-conditioned policy, evaluation
   rl/         PPO, task builders, residual policy
+  benchmark.py  conditions and harness of the generalization benchmark
   learning/   observation/action spaces, demonstrations, behaviour cloning, DAgger, evaluation
   perception/ RGB-D camera model, colour + depth localization, noise model, vision-driven policy wrapper
   skills/     scripted, planned and reactive (state-feedback) pick-and-place, episode runner

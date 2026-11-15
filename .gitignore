@@ -18,3 +18,5 @@ outputs/models/*
 !outputs/models/language_parser.json
 !outputs/models/language_policy.pt
 !outputs/models/language_policy.json
+outputs/demo_scenes/
+outputs/demo_stills/

@@ -37,5 +37,6 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - ⬜ M21 VLA fine-tuning investigation: not attempted (needs a GPU and pretrained weights)
 
 ## Stage 7: Evaluation & portfolio
-- ⬜ M22 Generalization benchmark
-- ⬜ M23 Report, demo video, README, resume bullets
+- 🧪 M22 Generalization benchmark: 6 policies × 13 conditions × 100 seeded episodes, severity sweeps for sensing jitter, sensing offset and latency, placement precision, failure types (docs/results_stage7.md)
+- ✅ M23 Final report (docs/report.md), demo video rendered from live simulation (outputs/demo.mp4), README front page
+- ⬜ ROS 2 wrapper (optional): not done
