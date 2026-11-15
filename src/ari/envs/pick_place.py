@@ -39,6 +39,18 @@ class SceneConfig:
     # MuJoCo's recommended setting for grasping and cuts the creep ~10x (devlog.md).
     elliptic_cone: bool = True
     impratio: float = 10.0
+    # Optional wall between the cube region and the target region (M8).
+    wall: bool = False
+    wall_y: float = 0.05                    # centre line of the wall
+    wall_thickness: float = 0.03
+    wall_x: tuple = (0.25, 0.75)            # extent along x
+    wall_height: tuple = (0.18, 0.30)       # sampled per episode
+
+    @classmethod
+    def with_wall(cls, **kw) -> "SceneConfig":
+        """Wall scene: cube and target regions pulled back so neither touches the wall."""
+        return cls(wall=True, cube_region=((0.40, 0.60), (-0.28, -0.06)),
+                   target_region=((0.40, 0.60), (0.15, 0.30)), **kw)
 
 
 @dataclass
@@ -48,6 +60,7 @@ class EpisodeSpec:
     cube_xy: np.ndarray
     cube_yaw: float
     target_xy: np.ndarray
+    wall_height: float = 0.0
 
 
 def build_model(cfg: SceneConfig) -> mujoco.MjModel:
@@ -74,6 +87,17 @@ def build_model(cfg: SceneConfig) -> mujoco.MjModel:
         size=[cfg.target_radius, 0.0005, 0],
         rgba=[0.2, 0.8, 0.3, 0.5],
     )
+    if cfg.wall:
+        # Compiled at the MAXIMUM height; reset() only ever shrinks it, so the broad-phase
+        # bounding sphere computed at compile time stays conservative.
+        h = cfg.wall_height[1]
+        wall = spec.worldbody.add_body(name="wall", pos=[np.mean(cfg.wall_x), cfg.wall_y, h / 2])
+        wall.add_geom(
+            name="wall_geom",
+            type=mujoco.mjtGeom.mjGEOM_BOX,
+            size=[(cfg.wall_x[1] - cfg.wall_x[0]) / 2, cfg.wall_thickness / 2, h / 2],
+            rgba=[0.55, 0.55, 0.6, 1.0],
+        )
     model = spec.compile()
     if cfg.elliptic_cone:
         model.opt.cone = mujoco.mjtCone.mjCONE_ELLIPTIC
@@ -98,6 +122,7 @@ class PickPlaceEnv:
         self.cube_body = self.model.body("cube").id
         self.target_site = self.model.site("target").id
         self.hand_body = self.model.body("hand").id
+        self.wall_geom = self.model.geom("wall_geom").id if self.cfg.wall else None
         self.episode: EpisodeSpec | None = None
 
     # ---------- episode setup ----------
@@ -111,7 +136,8 @@ class PickPlaceEnv:
             if np.linalg.norm(cube_xy - target_xy) >= self.cfg.min_separation:
                 break
         cube_yaw = rng.uniform(-np.pi, np.pi)
-        return EpisodeSpec(seed, cube_xy, cube_yaw, target_xy)
+        wall_h = rng.uniform(*self.cfg.wall_height) if self.cfg.wall else 0.0
+        return EpisodeSpec(seed, cube_xy, cube_yaw, target_xy, wall_h)
 
     def reset(self, seed: int) -> EpisodeSpec:
         ep = self.sample_episode(seed)
@@ -123,6 +149,9 @@ class PickPlaceEnv:
         d.qpos[c:c + 3] = [*ep.cube_xy, self.cfg.cube_half_size]
         d.qpos[c + 3:c + 7] = [np.cos(ep.cube_yaw / 2), 0, 0, np.sin(ep.cube_yaw / 2)]
         m.site_pos[self.target_site, :2] = ep.target_xy
+        if self.wall_geom is not None:
+            m.geom_size[self.wall_geom, 2] = ep.wall_height / 2
+            m.body_pos[m.body("wall").id, 2] = ep.wall_height / 2
         d.ctrl[:7] = Q_HOME
         d.ctrl[7] = 255  # gripper open
         mujoco.mj_forward(m, d)
@@ -154,6 +183,16 @@ class PickPlaceEnv:
 
     def cube_on_table(self) -> bool:
         return self.data.xpos[self.cube_body][2] < self.cfg.cube_half_size + 0.005
+
+    def wall_contacts(self) -> float:
+        """Deepest penetration (m, >= 0) of anything into the wall right now; 0 if no contact."""
+        if self.wall_geom is None:
+            return 0.0
+        deepest = 0.0
+        for c in self.data.contact[: self.data.ncon]:
+            if self.wall_geom in (c.geom1, c.geom2) and c.dist < 0:
+                deepest = max(deepest, -c.dist)
+        return deepest
 
     def is_success(self) -> bool:
         return self.cube_on_table() and self.placement_error() < self.cfg.target_radius

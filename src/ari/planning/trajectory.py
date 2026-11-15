@@ -66,3 +66,61 @@ def duration_for(T0: np.ndarray, T1: np.ndarray, max_speed: float = 0.25, max_ro
     d = np.linalg.norm(T1[:3, 3] - T0[:3, 3])
     ang = np.linalg.norm(rot_to_axis_angle(T0[:3, :3].T @ T1[:3, :3]))
     return max(min_duration, 1.875 * d / max_speed, 1.875 * ang / max_rot_speed)
+
+
+@dataclass
+class JointPathTrajectory:
+    """Executes a list of joint-space waypoints, min-jerk timed on each segment.
+
+    The arm comes to rest at every waypoint. That is wasteful but simple and safe:
+    the robot is exactly on the collision-checked straight segments at all times.
+    Smoother alternatives (splines through the waypoints) can cut corners that were
+    never collision-checked, so they need re-checking; noted as future work.
+    """
+
+    waypoints: list
+    max_joint_speed: float = 0.8  # rad/s peak, per joint
+
+    def __post_init__(self):
+        self.waypoints = [np.asarray(q, float) for q in self.waypoints]
+        durs = [max(0.3, 1.875 * np.abs(b - a).max() / self.max_joint_speed)
+                for a, b in zip(self.waypoints[:-1], self.waypoints[1:])]
+        self.seg_durations = durs
+        self.seg_starts = np.concatenate([[0.0], np.cumsum(durs)])
+        self.duration = float(self.seg_starts[-1])
+
+    def __call__(self, t: float) -> np.ndarray:
+        if t >= self.duration or len(self.waypoints) == 1:
+            return self.waypoints[-1].copy()
+        i = int(np.searchsorted(self.seg_starts, t, side="right") - 1)
+        s = min_jerk((t - self.seg_starts[i]) / self.seg_durations[i])
+        return (1 - s) * self.waypoints[i] + s * self.waypoints[i + 1]
+
+    def done(self, t: float) -> bool:
+        return t >= self.duration
+
+
+@dataclass
+class DenseJointPath:
+    """A finely sampled joint path (e.g. from a Cartesian straight line), traversed with
+    ONE min-jerk time scaling over its whole length: smooth, no stops between points.
+
+    points[i] corresponds to path parameter s_i = i / (n - 1), and the min-jerk profile
+    maps time -> s, exactly like PoseTrajectory does for Cartesian poses.
+    """
+
+    points: list
+    duration: float
+
+    def __post_init__(self):
+        self.points = np.asarray(self.points, float)
+
+    def __call__(self, t: float) -> np.ndarray:
+        s = min_jerk(t / self.duration) if self.duration > 0 else 1.0
+        x = s * (len(self.points) - 1)
+        i = min(int(x), len(self.points) - 2)
+        f = x - i
+        return (1 - f) * self.points[i] + f * self.points[i + 1]
+
+    def done(self, t: float) -> bool:
+        return t >= self.duration

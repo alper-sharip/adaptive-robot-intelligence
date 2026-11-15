@@ -47,6 +47,17 @@ class CartesianController:
         self.q_cmd = res.q  # use best effort even if not fully converged
         return res.success
 
+    def set_joint_target(self, q: np.ndarray) -> None:
+        """Bypass IK: command joint angles directly (used to execute planned joint paths)."""
+        self.q_cmd = np.array(q, dtype=float)
+
+    def set_target(self, target: np.ndarray) -> None:
+        """A 4x4 TCP pose -> IK; a (7,) vector -> joint target."""
+        if np.shape(target) == (4, 4):
+            self.set_pose_target(target)
+        else:
+            self.set_joint_target(target)
+
     def set_gripper(self, closed: bool) -> None:
         self.gripper_cmd = GRIPPER_CLOSED if closed else GRIPPER_OPEN
 

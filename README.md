@@ -21,7 +21,7 @@ and RL policies are compared on a fixed, seeded evaluation set.
 | M6 Minimum-jerk trajectories | 🧪 Tested | `tests/test_trajectory.py` |
 | M7 Scripted pick-and-place baseline | 🧪 Tested | 100/100 seeded episodes, stress-tested in 9 configurations |
 | M9 Seeded evaluation with confidence intervals | ✅ Implemented | `scripts/evaluate_scripted.py` |
-| M8 Collision-aware planning | ⬜ Planned | next |
+| M8 Collision-aware planning (RRT-Connect, 7-DoF posture search) | 🧪 Tested | 96% clean success over a random wall vs 60% for a hand-written heuristic |
 | Stage 3+ Perception, learning, … | ⬜ Planned | see `docs/roadmap.md` |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
@@ -44,6 +44,22 @@ and RL policies are compared on a fixed, seeded evaluation set.
 Debugging these runs uncovered four simulation issues: friction creep, a friction parameter
 that had no effect, a weak gripper, and an underdamped finger servo. All four are diagnosed in
 [`docs/devlog.md`](docs/devlog.md).
+
+### Collision-aware planning (M8)
+
+![planned around the wall](outputs/wall_planned_seed1.gif)
+
+A wall of random height (18-30 cm) between cube and target, 100 seeded episodes. *Clean* = placed with zero wall contact.
+Full analysis: [`docs/results_m8.md`](docs/results_m8.md).
+
+| Policy | Clean success (95% CI) | Episodes touching wall |
+|---|---|---|
+| Stage 2 scripted (naive) | 0% | 100 |
+| Hand-written "lift above the wall" | 60% (50-69) | 40 |
+| **Planned** (RRT-Connect + posture search) | **96%** (90-98) | **0** |
+
+The heuristic's main failure was the **elbow** hitting the wall while grasping cubes near
+it. The planner uses the Panda's 7th joint to choose an arm posture that stays clear.
 
 ### Reaching (Stage 1)
 
@@ -76,7 +92,9 @@ python scripts/joint_step_response.py             # control experiment -> output
 python scripts/ik_demo.py --gravity-comp          # IK + execution -> outputs/
 python scripts/pick_place_demo.py --seed 3        # one episode -> GIF + plots in outputs/
 python scripts/evaluate_scripted.py               # 100-episode evaluation (~2-6 min)
-pytest                                            # 53 tests
+python scripts/pick_place_demo.py --wall --policy planned --seed 1   # planning demo
+python scripts/evaluate_wall.py --policy planned  # naive vs heuristic vs planned
+pytest                                            # 67 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
@@ -87,9 +105,9 @@ If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`
 src/ari/
   robot/      model loading, transforms, forward kinematics, Jacobian, IK
   control/    joint-space PD control, gravity compensation, Cartesian (IK-based) controller
-  planning/   minimum-jerk pose trajectories
+  planning/   trajectories, collision checking, RRT-Connect, redundancy resolution
   envs/       pick-and-place scene with seeded randomization
-  skills/     scripted pick-and-place policy + episode runner with failure attribution
+  skills/     scripted and planned pick-and-place policies, episode runner with failure attribution
 scripts/      runnable experiments
 tests/        automated checks (kinematics vs MuJoCo, IK success rate, control behaviour)
 docs/         roadmap, development log, concept notes

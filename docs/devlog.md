@@ -86,3 +86,44 @@ its half-height). The fingers penetrated the cube.
 √10 ≈ 3.2×, so the fingers closed underdamped and fast enough to tunnel into the contact.
 **Fix:** scale kd by √(scale) to keep ζ constant. 7% → 100%.
 **Lesson:** never change stiffness without asking what happens to the damping ratio.
+
+## 2026-11-14: M8 collision-aware planning
+
+Built: wall scene (random height 18-30 cm per episode), collision checker, RRT-Connect +
+shortcutting, posture search using the 7th DoF, collision-checked Cartesian paths, planned
+pick-and-place policy, comparison script. Results: docs/results_m8.md.
+
+### Bug: inflated geom margins gave an inconsistent safety distance
+**First design:** set every geom's `margin` to 2 cm and call `mj_collision`.
+**Symptoms:** (a) the home pose was "in collision" with itself (links 5 and 7 are 2.3 cm
+apart); (b) the hand 3.7 cm from the floor was flagged but a fingertip 7 mm away was not.
+MuJoCo's effective margin depends on the shape types involved (pairs sum margins; some
+colliders treat margins differently).
+**Fix:** two separate checks. Robot-vs-obstacle uses `mj_geomDistance` (exact signed distance,
+compared against the margin). Self-collision and the floor use `mj_collision` and count only
+real overlap (dist < 0).
+
+### Finding: the hand is 20 cm wide; four yaws are not equal near a wall
+Hovering above a target 9 cm from the wall, the hand collided whenever its finger axis
+pointed at the wall. The cube's 90° symmetry gives four equally valid grasp/place yaws;
+the planner tries each and keeps the first collision-free one.
+
+### Finding: the elbow, not the hand, hit the wall
+For cubes 10-14 cm from the wall, every grasp yaw collided, but the collision was **link 5
+(elbow) 13-42 mm inside the wall**, not the hand. IK's null-space term pulls toward the home
+posture, which swings the elbow toward the wall when reaching down. Fix: search over arm
+postures (IK from 40 random start postures, each used as its own null-space preference).
+That is what the 7th joint is for.
+
+### Bug: posture chosen at the top of a vertical move drifted into the wall on the way down
+Choosing a clear posture above the cube and holding it during the descent still brought
+links 5/6 to 18-19 mm of the wall (inside the 20 mm margin) near the bottom.
+**Fix:** anchor the posture at the most constrained pose (the grasp / the place pose) and
+trace the straight-line paths **upward** from there. Planned success on the first 12 seeds
+went from 6/12 to 10/12.
+
+### Test bug: the open gripper straddles a thin wall
+A margin test assumed the fingertips would be ~1 cm above the wall; the checker said "free".
+It was right: pointing down across the wall, the open fingers (8 cm gap) straddle the 3 cm
+wall, 25 mm from each face. Rotating the hand 90° gives the intended geometry. Measured
+fingertip offset: 8.9 mm below the TCP. The margin flips exactly at 20 mm clearance.

@@ -74,14 +74,14 @@ class ScriptedPickPlace:
         self._start = env.tcp_pose()
         self._traj = self._make_traj(self._start, self.phases[0])
 
-    def _make_traj(self, T0, phase):
+    def _make_traj(self, T0, phase, env=None, q_cmd=None):
         return PoseTrajectory(T0, phase.goal, duration_for(T0, phase.goal, max_speed=self.max_speed))
 
     @property
     def phase(self) -> str:
         return self.phases[self._i].name if self._i < len(self.phases) else "done"
 
-    def act(self, env: PickPlaceEnv, dt: float):
+    def act(self, env: PickPlaceEnv, dt: float, q_cmd=None):
         if self._i >= len(self.phases):
             return None
         ph = self.phases[self._i]
@@ -91,7 +91,7 @@ class ScriptedPickPlace:
             self._i += 1
             self._t = 0.0
             if self._i < len(self.phases):
-                self._traj = self._make_traj(ph.goal, self.phases[self._i])
+                self._traj = self._make_traj(ph.goal, self.phases[self._i], env=env, q_cmd=q_cmd)
         return T, ph.gripper_closed
 
 
@@ -103,6 +103,9 @@ class EpisodeResult:
     placement_error: float  # m
     duration: float         # s of simulated time
     ik_failures: int
+    wall_contact_steps: int = 0      # control steps during which anything touched the wall
+    max_wall_penetration: float = 0.0  # m
+    plan_time: float = 0.0           # s spent planning (planned policies only)
     slip: float = 0.0       # m the cube slid down in the fingers while carried (lift end -> transport end)
     phase_log: list = field(default_factory=list)
 
@@ -118,15 +121,20 @@ def run_episode(env: PickPlaceEnv, policy, seed: int, frame_callback=None, frame
     phase_log = []
     offset_after_lift = None
     slip = 0.0
+    wall_steps, wall_pen = 0, 0.0
     k = 0
     while True:
-        action = policy.act(env, ctrl.control_dt)
+        action = policy.act(env, ctrl.control_dt, q_cmd=ctrl.q_cmd)
         if action is None:
             break
-        T, closed = action
-        ctrl.set_pose_target(T)
+        target, closed = action
+        ctrl.set_target(target)
         ctrl.set_gripper(closed)
         ctrl.step()
+        pen = env.wall_contacts()
+        if pen > 0:
+            wall_steps += 1
+            wall_pen = max(wall_pen, pen)
         if frame_callback is not None and k % frame_every == 0:
             frame_callback(env, policy.phase)
         k += 1
@@ -152,7 +160,10 @@ def run_episode(env: PickPlaceEnv, policy, seed: int, frame_callback=None, frame
         ctrl.step()
 
     success = env.is_success()
+    if not success and getattr(policy, "failure_reason", ""):
+        failure = policy.failure_reason  # the planner knew it couldn't do the task
     if not success and not failure:
         failure = "placement_miss" if env.cube_on_table() else "not_on_table"
     return EpisodeResult(seed, success, "" if success else failure, env.placement_error(),
-                         float(env.data.time), ctrl.ik_failures, slip, phase_log)
+                         float(env.data.time), ctrl.ik_failures, wall_steps, wall_pen,
+                         getattr(policy, "plan_time", 0.0), slip, phase_log)

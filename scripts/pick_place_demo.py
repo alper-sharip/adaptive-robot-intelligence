@@ -8,6 +8,8 @@ Saves:
 Run:  python scripts/pick_place_demo.py --seed 0
       MUJOCO_GL=egl python scripts/pick_place_demo.py   (headless Linux / Colab)
 Try:  --max-speed 0.5, --grasp-depth 0.015 (grasp higher on the cube), --friction 0.3
+Wall: --wall --policy planned   (collision-aware, M8)
+      --wall --policy naive     (Stage 2 policy, drives through the wall)
 """
 
 import argparse
@@ -23,17 +25,24 @@ from PIL import Image
 
 from ari.envs.pick_place import PickPlaceEnv, SceneConfig
 from ari.skills.pick_place import ScriptedPickPlace, run_episode
+from ari.skills.planned_pick_place import PlannedPickPlace
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument("--max-speed", type=float, default=0.25)
 parser.add_argument("--grasp-depth", type=float, default=0.0)
 parser.add_argument("--friction", type=float, default=1.0)
+parser.add_argument("--wall", action="store_true", help="add the wall obstacle (M8)")
+parser.add_argument("--policy", choices=["scripted", "naive", "planned"], default="scripted")
 parser.add_argument("--outdir", type=Path, default=Path("outputs"))
 args = parser.parse_args()
 
-env = PickPlaceEnv(SceneConfig(cube_friction=args.friction))
-policy = ScriptedPickPlace(max_speed=args.max_speed, grasp_depth=args.grasp_depth)
+cfg_kw = dict(cube_friction=args.friction)
+env = PickPlaceEnv(SceneConfig.with_wall(**cfg_kw) if args.wall else SceneConfig(**cfg_kw))
+if args.policy == "planned":
+    policy = PlannedPickPlace(max_speed=args.max_speed, grasp_depth=args.grasp_depth, plan_seed=args.seed)
+else:
+    policy = ScriptedPickPlace(max_speed=args.max_speed, grasp_depth=args.grasp_depth)
 
 renderer = mujoco.Renderer(env.model, height=360, width=480)
 cam = mujoco.MjvCamera()
@@ -54,11 +63,12 @@ def on_frame(env, phase):
 
 res = run_episode(env, policy, args.seed, frame_callback=on_frame, frame_every=10)
 print(f"seed {res.seed}: success={res.success} failure='{res.failure}' "
-      f"placement error={1000 * res.placement_error:.1f} mm, {res.duration:.2f} s, IK failures={res.ik_failures}")
+      f"placement error={1000 * res.placement_error:.1f} mm, {res.duration:.2f} s, "
+      f"wall contact steps={res.wall_contact_steps}, planning={res.plan_time:.2f} s")
 print("phase end times:", res.phase_log)
 
 args.outdir.mkdir(parents=True, exist_ok=True)
-stem = args.outdir / f"pick_place_seed{args.seed}"
+stem = args.outdir / (f"pick_place_seed{args.seed}" if not args.wall else f"wall_{args.policy}_seed{args.seed}")
 # GIF at half resolution with a shared 64-colour palette keeps the file small enough for GitHub.
 gif = [Image.fromarray(f).resize((320, 240)) for f in frames]
 palette = gif[len(gif) // 2].quantize(colors=64)
