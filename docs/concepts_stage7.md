@@ -18,7 +18,7 @@ judged on the simulator's true state. Mixing the two up (judging success on the 
 would reward a policy for agreeing with its own sensor.
 
 ## 4. A mean over conditions is not a ranking
-Three policies average 84.5% here and fail on completely different columns. The average
+Before the fixes three policies averaged 84.5% and failed on completely different columns. The average
 depends on which conditions were put in the table: add two more "moved cube" columns and the
 scripted policy drops, add two more "odd cube size" columns and the reactive one does. Report
 the profile; use a mean only as a summary of that specific table.
@@ -50,7 +50,8 @@ author's own conclusions turned out wrong. A reader can then decide how far to t
    failure of generalization, of specification, or of testing? What would you change?
 2. The 500-demo clone beats its own teacher on the 5 cm cube. How can a copy outperform the
    original, and why does DAgger undo it?
-3. Latency costs the learned policies 26-44 points but not their teacher. Propose one experiment
-   that would tell whether the cause is the delay itself or the errors the delay makes visible.
+3. Before the fix, 100 ms of latency cost the learned policies 26-44 points. Explain why
+   anchoring each step to the observed pose fixes it, why it needed no retraining, and why
+   the arm then becomes slower as the delay grows.
 4. Why does 2 mm of sensing jitter raise the 100-demo clone's success?
 5. You may add one column to the benchmark before a real-robot trial. Which, and why?

@@ -107,6 +107,9 @@ def sweeps(store, path):
                 continue
             ax.plot(xs, ys, color=SERIES[k], lw=2, marker=MARKERS[k], ms=7, mec=SURFACE, mew=1.2, label=label, clip_on=False,
                     zorder=3 + k)
+        if axis == "latency":   # the drop past 200 ms is the 20 s episode limit, not failure (results_stage7.md)
+            ax.text(0.03, 0.25, "Past 200 ms the arm is slower and\nruns out of the 20 s episode limit.\nGiven 90 s: 30/30 at 300 and 500 ms.",
+                    transform=ax.transAxes, ha="left", va="top", fontsize=8.5, color=MUTED, linespacing=1.3)
         ax.set_xlabel(xlabel, fontsize=10, color=INK)
         ax.set_xticks(xs)
         ax.set_xticklabels([f"{v:g}" for v in xs], fontsize=9, color=MUTED)
@@ -185,15 +188,18 @@ def tables(store, specs, labels, grid, mean) -> str:
                 "| " + " | ".join("n/r" if r is None else f"{100 * r['success_rate']:.0f} ({100 * r['ci95'][0]:.0f}-{100 * r['ci95'][1]:.0f})"
                                   for _, r in img) + " |"]
 
-    if any("latency_abs@" in k for k in store):
-        out += ["", "## Latency, two ways: success rate (%)\n",
-                "| Policy | No delay | 100 ms, step relative to the pose at application | 100 ms, original pose target kept | "
-                "200 ms, relative | 200 ms, target kept |", "|---|---|---|---|---|---|"]
+    if any("latency_legacy@" in k for k in store):
+        out += ["", "## Latency before and after the fix: success rate (%)\n",
+                "Old: steps relative to the pose when the action is applied. Fixed: relative to the pose the policy observed.\n",
+                "| Policy | No delay | 50 ms old | 50 ms fixed | 100 ms old | 100 ms fixed | 150 ms old | 150 ms fixed | "
+                "200 ms old | 200 ms fixed |", "|---|" + "---|" * 9]
         for spec, (label, _) in B.POLICIES.items():
-            cells = [rate(store, spec, c) for c in ("nominal", "latency", "latency_abs@2", "latency@4", "latency_abs@4")]
+            cells = [rate(store, spec, "nominal")]
+            for k in (1, 2, 3, 4):
+                cells += [rate(store, spec, f"latency_legacy@{k}"), rate(store, spec, "latency" if k == 2 else f"latency@{k}")]
             out.append(f"| {label} | " + " | ".join("n/r" if v is None else f"{v:.0f}" for v in cells) + " |")
 
-    extras = [k for k in store if k.split("|")[0] == "reactive#size" or "heavy@" in k]
+    extras = [k for k in store if k.split("|")[0] == "reactive#4cm" or "heavy@" in k]
     if extras:
         out += ["", "## Footnote measurements\n", "| Cell | Success |", "|---|---|"]
         out += [f"| {k} | {store[k]['successes']}/{store[k]['n']} |" for k in extras]

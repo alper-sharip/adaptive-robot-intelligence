@@ -14,7 +14,7 @@ Seeds: episodes 0-99; sensing noise seed + 100000; cube shift seed + 500000 (as 
 
 from __future__ import annotations
 
-from collections import Counter, deque
+from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
 
 import numpy as np
@@ -33,7 +33,7 @@ class Condition:
     jitter: float = 0.0                     # m: fresh Gaussian error on the sensed cube position, every reading
     offset: float = 0.0                     # m: constant error on the sensed cube position (random direction per episode)
     delay_steps: int = 0                    # actions take effect this many 50 ms steps late
-    delay_absolute: bool = False            # experiment: the delayed action keeps the pose target it was computed for
+    interface: str = "observed"             # what an action's step is relative to (learning/demos.py ActionExecutor)
     outside: float = 0.0                    # m: cube starts in a band this wide AROUND the training area
 
 
@@ -58,7 +58,7 @@ CONDITIONS: dict[str, Condition] = {
 SWEEPS: dict[str, tuple[str, str, list]] = {
     "jitter": ("jitter", "Sensing jitter (mm)", [0.001, 0.002, 0.005, 0.010]),
     "offset": ("offset", "Sensing offset (mm)", [0.002, 0.005, 0.010, 0.020]),
-    "latency": ("delay_steps", "Action latency (ms)", [1, 2, 3, 4]),
+    "latency": ("delay_steps", "Action latency (ms)", [1, 2, 3, 4, 6, 10]),
 }
 
 
@@ -67,9 +67,10 @@ def get_condition(name: str) -> Condition:
     if "@" not in name:
         return CONDITIONS[name]
     axis, value = name.split("@")
-    if axis == "latency_abs":                    # experiment (results_stage7.md): same delay, absolute targets
-        return replace(CONDITIONS["latency"], delay_steps=int(value), delay_absolute=True,
-                       label=f"Latency {50 * int(value)} ms, absolute", what="delayed actions keep their original pose target")
+    if axis == "latency_legacy":                 # the action interface before the latency fix (Stages 4-7)
+        return replace(CONDITIONS["latency"], delay_steps=int(value), interface="applied",
+                       label=f"Latency {50 * int(value)} ms, old interface",
+                       what="steps relative to the pose when the action is applied (before the fix)")
     if axis == "heavy":                          # footnote measurement: another cube mass (kg)
         return replace(CONDITIONS[axis], scene={"cube_mass": float(value)})
     attr = SWEEPS[axis][0]
@@ -129,36 +130,6 @@ class BenchEnv(PickPlaceEnv):
         return T
 
 
-class Delayed:
-    """Actions take effect `k` policy steps late. Until the first one arrives the arm holds.
-
-    An action is a step relative to the gripper pose measured when it is APPLIED
-    (learning/spaces.py). A late action is therefore added to a pose the policy never saw: the
-    commanded target overshoots by however far the arm travelled during the delay.
-    env given (absolute=True in the condition): the action is converted to the pose target it
-    meant when it was computed, and re-expressed relative to the pose at application time. Same
-    delay, no overshoot. Used to separate the two effects (results_stage7.md)."""
-
-    def __init__(self, policy, k: int, env=None):
-        self.policy, self.k, self.env = policy, k, env
-        self.queue: deque = deque()
-
-    def reset(self):
-        if hasattr(self.policy, "reset"):
-            self.policy.reset()
-        self.queue = deque(None for _ in range(self.k))
-
-    def __call__(self, obs):
-        from ari.learning.spaces import action_from_target, target_from_action
-
-        a = self.policy(obs)
-        self.queue.append(target_from_action(self.env.tcp_pose(), a) if self.env is not None else a)
-        late = self.queue.popleft()
-        if late is None:
-            return np.zeros(5, dtype=np.float32)
-        return action_from_target(self.env.tcp_pose(), *late) if self.env is not None else late
-
-
 def _chunk(args):
     spec, cond_name, seeds, max_time = args
     import torch
@@ -169,16 +140,16 @@ def _chunk(args):
     torch.set_num_threads(1)
     cond = get_condition(cond_name)
     env = BenchEnv(cond)
-    if spec == "reactive#size":                 # the reactive policy TOLD the cube size (one parameter)
+    if spec == "reactive#4cm":                  # the reactive policy before the fix: cube size fixed at 4 cm
         from ari.skills.reactive_pick_place import ReactiveExpert
 
-        expert = ReactiveExpert(half=env.cfg.cube_half_size)
+        expert = ReactiveExpert(half=0.02)
         policy = lambda obs: expert(env)        # noqa: E731
     else:
         policy = make_policy(spec, env)
-    if cond.delay_steps:
-        policy = Delayed(policy, cond.delay_steps, env if cond.delay_absolute else None)
+    # Latency sits between the policy and the arm, so it is part of the executor.
     return [asdict(demos.rollout(env, policy, s, max_time=max_time, joint_interp=True,
+                                 latency_steps=cond.delay_steps, interface=cond.interface,
                                  disturbance=CubeShift(s) if cond.shift_cube else None)) for s in seeds]
 
 

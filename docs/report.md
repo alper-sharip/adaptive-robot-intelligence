@@ -27,8 +27,8 @@ where I first drew the wrong conclusion, that is reported too (section 4).
 | Generalization benchmark, 6 policies × 13 conditions × 100 episodes | no policy is best everywhere; each fails in its own way | [Stage 7](results_stage7.md) |
 
 The figure above is the last result and the best summary: six policies, each run on the same
-100 episodes under 13 conditions they were not trained on. Three of them tie on average and
-fail in entirely different places.
+100 episodes under 13 conditions they were not trained on. Each fails in its own place, and
+two of the failures it found were flaws of mine, now fixed (section 3.1).
 
 ## 2. System
 
@@ -104,21 +104,23 @@ Six policies × 13 conditions × 100 seeded episodes ([Stage 7](results_stage7.m
 showed that single-condition evaluation had not:
 
 - **Hand-written policies fail completely on the one thing they assume** (the scripted policy
-  when the cube moves: 0%; the reactive policy on a 5 cm cube, because the cube size is a
-  constant in its code: 0%, and 100% once told the size). **Learned policies lose a little
-  almost everywhere** instead.
-- **A clone can beat its teacher.** On the 5 cm cube the 500-demo clone scores 78% against the
-  teacher's 0%; with 5 mm sensing jitter the 500-demo clones stay at 100% while the teacher drops to 1%.
+  when the cube moves: 0%; the reactive policy on a 5 cm cube, because the cube size was a
+  constant in its code: 0%, now fixed, 100%). **Learned policies lose a little almost
+  everywhere** instead.
+- **A clone can beat its teacher.** On the 5 cm cube the 500-demo clone scored 78% against the
+  unfixed teacher's 0%; with 5 mm sensing jitter the 500-demo clones stay at 100% while the teacher drops to 1%.
   DAgger, which copies the teacher more faithfully, loses the first of these advantages (8%).
-- **Latency exposed a flaw in my own action interface.** With 100 ms of delay every learned
-  policy lost 26-44 points; at 200 ms even the hand-written ones collapsed. Actions here are
-  steps relative to the pose measured when the action is applied, so a late action lands on a
-  pose the policy never saw. Keeping the original pose target under the same delay restored
-  all six policies to their undelayed level (93-100% for the five strong ones at 200 ms).
+- **Latency exposed a flaw in my own action interface, now fixed.** With 100 ms of delay every
+  learned policy lost 26-44 points; at 200 ms even the hand-written ones collapsed. Actions
+  were steps relative to the pose measured when the action is applied, so a late action landed
+  on a pose the policy never saw. Actions are now anchored to the pose the policy observed:
+  every policy is back at its undelayed level up to 200 ms, with no retraining (without delay
+  the two interfaces give identical episodes). What remains is speed: beyond 200 ms the arm
+  succeeds but slowly (30/30 at 500 ms given 90 s).
 - **One column is a hardware limit.** At friction 0.5 every policy scores 0-3%, because the
   gripper's 1 N per finger cannot hold the cube; a stiffer gripper restores them.
-- **More demonstrations generalized better than RL on fewer** (mean 84.5 for the 500-demo clone
-  against 72.0 for the 100-demo clone with residual RL).
+- **More demonstrations generalized better than RL on fewer** (mean 86.5 for the 500-demo clone
+  against 75.5 for the 100-demo clone with residual RL).
 - **The 3 cm success tolerance hid a precision gap.** Re-scored at 1 cm, the RL policy falls
   from 93% to 35%; the scripted, reactive and 500-demo policies stay at 97-100%.
 
@@ -133,8 +135,8 @@ showed that single-condition evaluation had not:
 | Pretrained text encoder in the language policy | 2/150 on one seed, 148/150 on another | partly explained (early commitment of the attention); a lower learning rate fixed the one case tried |
 | First held-out language split | both parsers 48.2% | explained: the split made word order irrelevant in training; redesigned |
 | "Word order cannot be learned from actions" | concluded from one seed; two more seeds learn it | **my error**, corrected in the same stage |
-| Actions relative to the pose at application time | a design choice from Stage 4 that makes every policy fragile to latency | **my design flaw**, found and explained by the benchmark; fix measured, not yet adopted as the default |
-| Cube size as a constant in the reactive policy | 0% on a 5 cm cube | **my oversight**, found by the benchmark; one parameter fixes it |
+| Actions relative to the pose at application time | a design choice from Stage 4 that made every policy fragile to latency | **my design flaw**, found by the benchmark; **fixed** (actions anchored to the observed pose), verified on the benchmark |
+| Cube size as a constant in the reactive policy | 0% on a 5 cm cube | **my oversight**, found by the benchmark; **fixed**, 100% |
 | Step-response rise time | first attributed to torque saturation | **my error**; an experiment showed it is set by kd/kp |
 | Vision-language-action fine-tuning (M21) | not attempted: needs a GPU and pretrained weights | not done |
 | Full-scale image policy, LeRobot ACT | scripts and a Colab notebook exist; ACT is smoke-tested only | not done |
@@ -172,9 +174,9 @@ showed that single-condition evaluation had not:
 
 1. **Close the perception loop for the learned policies:** feed Stage 3's estimates (not
    simulator poses) to the cloned and language-conditioned policies and re-run the benchmark.
-2. **Fix what the benchmark found:** make absolute pose targets the default action interface
-   (retrain, re-measure latency), pass the cube size to the reactive policy, and randomize cube
-   size during demonstration collection.
+2. **Latency compensation:** predict where the arm is now from the commands still in flight,
+   so the fixed interface stops slowing the arm down beyond 200 ms; and re-collect
+   demonstrations from the fixed reactive policy with randomized cube sizes.
 3. **GPU-scale image policy** (the Colab notebook), then DAgger on it once the collapse is
    understood.
 4. **VLA fine-tuning** with the Stage 6 evaluation as the benchmark and parser + skill as the

@@ -43,17 +43,17 @@ learned directly from pixels is at 43%.
 Each policy runs the same 100 episodes under 13 conditions it was not trained on. Analysis,
 severity sweeps and limits: [`docs/results_stage7.md`](docs/results_stage7.md).
 
-- **No policy is best everywhere.** Three tie at 85% on average and fail in entirely different
-  columns; the average is a summary of this table, not a ranking.
-- **Hand-written policies fail completely on the one thing they assume** (cube moved: 0%; cube
-  size, a constant in the reactive policy's code: 0%). Learned policies lose a little almost
-  everywhere.
-- **A clone can beat its teacher:** the 500-demo clone scores 78% against 0% on the 5 cm cube,
-  and 100% against 1% under 5 mm sensing jitter.
-- **Latency exposed a flaw in my own action interface.** Steps are relative to the pose measured
-  when the action is applied, so 100 ms of delay cost the learned policies 26-44 points. Keeping
-  the original pose target under the same delay restored every policy
-  ([details](docs/results_stage7.md)).
+- **No policy is best everywhere.** Each fails in its own columns; the average is a summary of
+  this table, not a ranking.
+- **Latency exposed a flaw in my own action interface, and it is fixed.** Steps were relative to
+  the pose measured when the action is applied, so 100 ms of delay cost the learned policies
+  26-44 points. Actions are now anchored to the pose the policy observed: every policy is back
+  at its undelayed level up to 200 ms, with no retraining ([details](docs/results_stage7.md)).
+- **Hand-written policies fail completely on the one thing they assume** (cube moved: 0%; the
+  reactive policy's hard-coded cube size: 0% on a 5 cm cube, now fixed). Learned policies lose a
+  little almost everywhere.
+- **A clone can beat its teacher:** the 500-demo clone scored 78% against the unfixed teacher's
+  0% on the 5 cm cube, and scores 100% against 1% under 5 mm sensing jitter.
 - **Friction 0.5 is a hardware limit:** the gripper's 1 N per finger cannot hold the cube, for
   any policy. A stiffer gripper restores them.
 

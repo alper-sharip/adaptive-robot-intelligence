@@ -46,7 +46,7 @@ def make_policy(spec: str, env):
     if spec == "scripted":
         return ScriptedAsPolicy(env)
     if spec == "reactive":
-        ex = ReactiveExpert()
+        ex = ReactiveExpert(half=env.cfg.cube_half_size)     # told the cube size (Stage 7 fix)
         return lambda obs: ex(env)
     import torch
 

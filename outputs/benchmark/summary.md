@@ -3,11 +3,11 @@
 | Policy | Nominal | Cube moved | Latency 100 ms | Sensing jitter | Sensing offset | Outside area | 3 cm cube | 5 cm cube | Heavy cube | Friction 0.7 | Friction 0.5 | Stiff gripper | Friction 0.5, stiff | Mean | Worst |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Scripted (open-loop) | 100 | 0 | 100 | 100 | 100 | 100 | 100 | 100 | 100 | 100 | 0 | 100 | 100 | 84.6 | 0 |
-| Reactive (feedback) | 100 | 100 | 100 | 100 | 100 | 98 | 100 | 0 | 100 | 100 | 1 | 100 | 100 | 84.5 | 0 |
-| Clone, 100 demos | 66 | 42 | 39 | 85 | 70 | 54 | 20 | 41 | 73 | 72 | 1 | 67 | 67 | 53.6 | 1 |
-| Clone, 500 demos | 100 | 63 | 74 | 100 | 100 | 92 | 90 | 78 | 99 | 100 | 3 | 100 | 100 | 84.5 | 3 |
-| Clone + DAgger | 97 | 99 | 53 | 100 | 98 | 89 | 88 | 8 | 96 | 98 | 0 | 97 | 97 | 78.5 | 0 |
-| 100-demo clone + RL | 93 | 73 | 49 | 96 | 88 | 78 | 34 | 71 | 86 | 93 | 0 | 92 | 83 | 72.0 | 0 |
+| Reactive (feedback) | 100 | 100 | 100 | 100 | 100 | 98 | 100 | 100 | 100 | 100 | 1 | 100 | 100 | 92.2 | 1 |
+| Clone, 100 demos | 66 | 42 | 78 | 85 | 70 | 54 | 20 | 41 | 73 | 72 | 1 | 67 | 67 | 56.6 | 1 |
+| Clone, 500 demos | 100 | 63 | 100 | 100 | 100 | 92 | 90 | 78 | 99 | 100 | 3 | 100 | 100 | 86.5 | 3 |
+| Clone + DAgger | 97 | 99 | 97 | 100 | 98 | 89 | 88 | 8 | 96 | 98 | 0 | 97 | 97 | 81.8 | 0 |
+| 100-demo clone + RL | 93 | 73 | 95 | 96 | 88 | 78 | 34 | 71 | 86 | 93 | 0 | 92 | 83 | 75.5 | 0 |
 
 ## Conditions
 
@@ -47,14 +47,14 @@
 | Clone + DAgger | 97 | 98 | 98 | 88 | 20 |
 | 100-demo clone + RL | 93 | 96 | 88 | 81 | 38 |
 
-| Action latency (ms) | 0 | 50 | 100 | 150 | 200 |
-|---|---|---|---|---|---|
-| Scripted (open-loop) | 100 | 100 | 100 | 100 | 11 |
-| Reactive (feedback) | 100 | 100 | 100 | 100 | 44 |
-| Clone, 100 demos | 66 | 71 | 39 | 10 | 0 |
-| Clone, 500 demos | 100 | 100 | 74 | 27 | 16 |
-| Clone + DAgger | 97 | 99 | 53 | 37 | 34 |
-| 100-demo clone + RL | 93 | 81 | 49 | 23 | 6 |
+| Action latency (ms) | 0 | 50 | 100 | 150 | 200 | 300 | 500 |
+|---|---|---|---|---|---|---|---|
+| Scripted (open-loop) | 100 | 100 | 100 | 100 | 100 | 100 | 100 |
+| Reactive (feedback) | 100 | 100 | 100 | 100 | 100 | 45 | 0 |
+| Clone, 100 demos | 66 | 77 | 78 | 82 | 83 | 28 | 0 |
+| Clone, 500 demos | 100 | 100 | 100 | 100 | 99 | 46 | 0 |
+| Clone + DAgger | 97 | 97 | 97 | 97 | 97 | 44 | 0 |
+| 100-demo clone + RL | 93 | 94 | 95 | 93 | 93 | 37 | 0 |
 
 ## Placement precision in the training conditions (successful episodes)
 
@@ -72,11 +72,11 @@
 | Policy | Episodes failed | never lifted | still holding / off table | dropped or misplaced | placed, did not retreat |
 |---|---|---|---|---|---|
 | Scripted (open-loop) | 200 of 1300 | 200 | 0 | 0 | 0 |
-| Reactive (feedback) | 201 of 1300 | 193 | 5 | 2 | 1 |
-| Clone, 100 demos | 603 of 1300 | 368 | 164 | 67 | 4 |
-| Clone, 500 demos | 201 of 1300 | 149 | 18 | 25 | 9 |
-| Clone + DAgger | 280 of 1300 | 155 | 92 | 24 | 9 |
-| 100-demo clone + RL | 364 of 1300 | 191 | 21 | 149 | 3 |
+| Reactive (feedback) | 101 of 1300 | 93 | 5 | 2 | 1 |
+| Clone, 100 demos | 564 of 1300 | 325 | 169 | 65 | 5 |
+| Clone, 500 demos | 175 of 1300 | 126 | 16 | 24 | 9 |
+| Clone + DAgger | 236 of 1300 | 112 | 91 | 24 | 9 |
+| 100-demo clone + RL | 318 of 1300 | 175 | 20 | 120 | 3 |
 
 ## Image policy (two 64x64 cameras), success rate (%)
 
@@ -84,22 +84,24 @@
 |---|---|---|
 | 42 (33-52) | 4 (2-10) | 7 (3-14) |
 
-## Latency, two ways: success rate (%)
+## Latency before and after the fix: success rate (%)
 
-| Policy | No delay | 100 ms, step relative to the pose at application | 100 ms, original pose target kept | 200 ms, relative | 200 ms, target kept |
-|---|---|---|---|---|---|
-| Scripted (open-loop) | 100 | 100 | 100 | 11 | 100 |
-| Reactive (feedback) | 100 | 100 | 100 | 44 | 100 |
-| Clone, 100 demos | 66 | 39 | 78 | 0 | 83 |
-| Clone, 500 demos | 100 | 74 | 100 | 16 | 99 |
-| Clone + DAgger | 97 | 53 | 97 | 34 | 97 |
-| 100-demo clone + RL | 93 | 49 | 94 | 6 | 93 |
+Old: steps relative to the pose when the action is applied. Fixed: relative to the pose the policy observed.
+
+| Policy | No delay | 50 ms old | 50 ms fixed | 100 ms old | 100 ms fixed | 150 ms old | 150 ms fixed | 200 ms old | 200 ms fixed |
+|---|---|---|---|---|---|---|---|---|---|
+| Scripted (open-loop) | 100 | 100 | 100 | 100 | 100 | 100 | 100 | 11 | 100 |
+| Reactive (feedback) | 100 | 100 | 100 | 100 | 100 | 100 | 100 | 44 | 100 |
+| Clone, 100 demos | 66 | 71 | 77 | 39 | 78 | 10 | 82 | 0 | 83 |
+| Clone, 500 demos | 100 | 100 | 100 | 74 | 100 | 27 | 100 | 16 | 99 |
+| Clone + DAgger | 97 | 99 | 97 | 53 | 97 | 37 | 97 | 34 | 97 |
+| 100-demo clone + RL | 93 | 81 | 94 | 49 | 95 | 23 | 93 | 6 | 93 |
 
 ## Footnote measurements
 
 | Cell | Success |
 |---|---|
-| reactive#size|large | 100/100 |
-| reactive#size|small | 100/100 |
+| reactive#4cm|small | 100/100 |
+| reactive#4cm|large | 0/100 |
 | reactive|heavy@0.2 | 0/100 |
 | outputs/models/bc_dagger.pt|heavy@0.2 | 0/100 |

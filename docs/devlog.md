@@ -436,3 +436,32 @@ slowly; frames are now taken by simulated time (one per 50 ms), whoever calls.
 
 ### Not done
 ROS 2 wrapper; M21 (VLA); full-scale image policy. Listed in docs/report.md section 7.
+
+## 2026-11-17: Latency fix and reactive cube size (follow-up to Stage 7)
+
+### Fix: actions are anchored to the pose the policy observed
+`ActionExecutor` now takes `(action, ref_pose)`, where `ref_pose` is the gripper pose read when
+the policy computed the action, and latency is modelled inside the executor (a queue of
+pending commands) instead of as a policy wrapper. `interface="applied"` keeps the old
+behaviour. Check before trusting it: five policy-condition cells without delay, plus the old
+interface under 100 ms, re-run and compared with the stored results episode by episode:
+identical. So no model needed retraining, and none of the 13 x 6 no-delay cells changed.
+
+Result: up to 200 ms every policy is at its undelayed level (old interface at 200 ms: 0-44%).
+Extending the sweep to 300 and 500 ms showed a new cliff (37-46%, then 0%). Logging one
+episode showed it was not failing: the arm moved slowly and ran out of the 20 s limit
+mid-carry. Each step is planned from a pose one delay old, so progress per decision shrinks
+as the delay grows (median episode 6.8 s at 0 ms, 15.8 s at 200 ms, 29.5 s at 500 ms). With
+90 s, 30/30 at both 300 and 500 ms for the reactive policy and the 500-demo clone. Next would
+be latency compensation (predict the current pose from commands in flight); not done.
+
+### Fix: the reactive policy is told the cube size
+`make_policy("reactive", env)` passes `env.cfg.cube_half_size`: 5 cm cube 0% -> 100%. The clones
+were trained on the old teacher and are unchanged; `reactive#4cm` reproduces the old row.
+
+### Bookkeeping
+Old latency cells renamed to `latency_legacy@k` in results.json (not re-run; they are the
+old interface by construction). The earlier one-off `latency_abs@k` cells were dropped: the
+new default reproduces them episode by episode in 11 of 12 cells; the RL policy at 100 ms
+differs by one episode (94 vs 95), probably the float32 round trip the old wrapper made
+(target -> action -> target), which the executor no longer needs.

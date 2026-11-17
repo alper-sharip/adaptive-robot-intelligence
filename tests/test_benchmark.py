@@ -59,14 +59,10 @@ def test_sensing_errors_change_what_policies_read_not_what_success_is_judged_on(
     assert np.allclose(again, reads[0])           # same seed, same sensing error: episodes are reproducible
 
 
-def test_delayed_policy_shifts_actions_by_k_steps_and_holds_still_first():
-    actions = [np.full(5, float(i), dtype=np.float32) for i in range(1, 6)]
-    it = iter(actions)
-    d = B.Delayed(lambda obs: next(it), 2)
-    d.reset()
-    out = [d(None) for _ in range(5)]
-    assert np.all(out[0] == 0) and np.all(out[1] == 0)
-    assert all(np.array_equal(out[i + 2], actions[i]) for i in range(3))
+def test_latency_conditions_use_the_fixed_interface_unless_asked_for_the_old_one():
+    assert B.CONDITIONS["latency"].interface == "observed" and B.CONDITIONS["latency"].delay_steps == 2
+    old = B.get_condition("latency_legacy@3")
+    assert old.interface == "applied" and old.delay_steps == 3
 
 
 def test_run_cell_reports_counts_and_intervals():

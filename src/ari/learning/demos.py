@@ -7,6 +7,7 @@ timestamp) so that converting to a LeRobotDataset in M15 is a rename, not a rede
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,12 +34,27 @@ class ActionExecutor:
     Both demonstration recording and policy rollouts go through this one class.
     """
 
-    def __init__(self, env: PickPlaceEnv, joint_interp: bool = False):
+    def __init__(self, env: PickPlaceEnv, joint_interp: bool = False, latency_steps: int = 0,
+                 interface: str = "observed"):
         """joint_interp=False: interpolate the Cartesian target, IK at every 100 Hz tick
         (Stage 4 behaviour). joint_interp=True: IK once per decision, interpolate the joint
         command. 5x fewer IK solves; used for reinforcement learning, where simulation
-        speed decides what is feasible."""
+        speed decides what is feasible.
+
+        An action is a step (dx, dy, dz, dyaw) plus a gripper command. What the step is
+        relative to (Stage 7, docs/results_stage7.md):
+          interface="observed" (default since the latency fix): the gripper pose the policy
+            observed when it computed the action. A late action still means the same target.
+          interface="applied" (Stages 4-7): the gripper pose measured when the action is
+            applied. Kept to reproduce earlier results. With no latency both are identical,
+            so every trained model works unchanged with either.
+        latency_steps: each action takes effect this many policy steps (50 ms each) late.
+            Until the first one arrives the arm holds its pose with the gripper open."""
+        if interface not in ("observed", "applied"):
+            raise ValueError(f"interface must be 'observed' or 'applied', not {interface!r}")
         self.env = env
+        self.interface = interface
+        self.queue: deque = deque([None] * latency_steps)
         self.ctrl = CartesianController(env.model, env.data)
         # Start the commanded posture at the MEASURED one (identical to home right after a
         # reset; matters when an executor is created mid-episode, as the task planner does).
@@ -48,8 +64,19 @@ class ActionExecutor:
         self.prev = env.tcp_pose().copy()
         self.joint_interp = joint_interp
 
-    def step(self, action: np.ndarray) -> None:
-        T_new, closed = target_from_action(self.env.tcp_pose(), action)
+    def step(self, action: np.ndarray, ref_pose: np.ndarray | None = None) -> None:
+        """Execute one action over one policy step. ref_pose: the gripper pose the action was
+        computed from (default: the pose now, which is the same thing when there is no delay)."""
+        if ref_pose is None or self.interface == "applied":
+            ref_pose = None                      # resolved at application time
+        else:
+            ref_pose = np.array(ref_pose, copy=True)
+        self.queue.append((np.asarray(action), ref_pose))
+        late = self.queue.popleft()
+        if late is None:                         # nothing has arrived yet: hold, gripper open
+            late = (np.zeros(5, dtype=np.float32), None)
+        action, ref_pose = late
+        T_new, closed = target_from_action(self.env.tcp_pose() if ref_pose is None else ref_pose, action)
         self.ctrl.set_gripper(closed)
         if self.joint_interp:
             q0 = self.ctrl.q_cmd.copy()
@@ -176,7 +203,8 @@ def run_policy(env: PickPlaceEnv, ex: "ActionExecutor", policy, max_time: float 
     while env.data.time - t0 < max_time:
         if disturbance is not None:
             disturbance(env, env.data.time - t0)
-        ex.step(policy(obs_fn(env)))
+        ref = env.tcp_pose().copy()            # the pose this decision is computed from
+        ex.step(policy(obs_fn(env)), ref)
         if frame_callback is not None:
             frame_callback(env)
         max_z = max(max_z, float(env.data.xpos[env.cube_body][2]))
@@ -188,14 +216,15 @@ def run_policy(env: PickPlaceEnv, ex: "ActionExecutor", policy, max_time: float 
 
 
 def rollout(env: PickPlaceEnv, policy, seed: int, max_time: float = 25.0, disturbance=None,
-            frame_callback=None, joint_interp: bool = False) -> RolloutResult:
+            frame_callback=None, joint_interp: bool = False, latency_steps: int = 0,
+            interface: str = "observed") -> RolloutResult:
     """Run a learned (or any obs->action) policy closed-loop for one seeded episode.
 
     policy: callable obs -> action (5,), with an optional .reset().
     disturbance: optional callable (env, t) applied every policy step (e.g. move the cube).
     """
     env.reset(seed)
-    ex = ActionExecutor(env, joint_interp=joint_interp)
+    ex = ActionExecutor(env, joint_interp=joint_interp, latency_steps=latency_steps, interface=interface)
     if hasattr(policy, "reset"):
         policy.reset()
     half = env.cfg.cube_half_size

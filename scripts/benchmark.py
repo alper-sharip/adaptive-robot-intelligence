@@ -32,9 +32,10 @@ if __name__ == "__main__":
     args.out.parent.mkdir(parents=True, exist_ok=True)
     store = json.loads(args.out.read_text()) if args.out.exists() else {}
     if args.extras:
-        cells = [("reactive#size", "large"), ("reactive#size", "small"), ("reactive", "heavy@0.2"),
+        cells = [("reactive#4cm", "large"), ("reactive#4cm", "small"), ("reactive", "heavy@0.2"),
                  (f"{B.M}/bc_dagger.pt", "heavy@0.2")]
-        cells += [(s, f"latency_abs@{k}") for k in (2, 4) for s in B.POLICIES]
+        # the action interface before the latency fix, at every latency strength
+        cells += [(s, f"latency_legacy@{k}") for k in (1, 2, 3, 4) for s in B.POLICIES]
     elif args.image:
         cells = [(B.IMAGE_POLICY[0], c) for c in B.IMAGE_CONDITIONS]
     elif args.sweeps:
