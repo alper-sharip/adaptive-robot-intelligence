@@ -313,7 +313,7 @@ python scripts/language_demo.py --seed 7 --faults # recovery demo -> GIF
 python scripts/benchmark.py                       # generalization benchmark (~40 min on 2 cores)
 python scripts/benchmark_report.py                # heatmap, sweeps, tables
 python scripts/make_demo_video.py                 # outputs/demo.mp4 from live simulation (needs ffmpeg)
-pytest                                            # 157 tests
+pytest                                            # 163 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
