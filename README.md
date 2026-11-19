@@ -28,13 +28,14 @@ intervals in the linked results. Failures and wrong turns are documented next to
 | Following typed instructions among 3 cubes and 3 targets | 149/150 with parser + skill; 108-146/150 end-to-end over three seeds |
 | Two-step tasks with injected faults | 95% with result checking and a fallback skill; 35-45% without |
 | Generalization benchmark: 6 policies × 13 conditions × 100 episodes | no policy is best everywhere (below) |
+| Learned policies on camera input, cube tracked every 50 ms | strong policies unchanged; the two weakest lose 18-19 of 300 paired episodes ([details](docs/results_camera.md)) |
 
 **Minimum viable system, as defined at the start:** pick a cube from a random position using
 only camera input, place it in a target zone, and compare scripted, imitation-learned and RL
-policies on a fixed seeded set. **Partly reached:** camera-only pick-and-place works with the
-classical camera pipeline driving the scripted policy (100/100, Stage 3); the three kinds of
-policy are compared on fixed seeds below, but on simulator state, not camera input; the policy
-learned directly from pixels is at 43%.
+policies on a fixed seeded set. **Reached:** scripted, imitation-learned and RL policies all run
+on camera input, with the cube tracked from images at every step, and are compared on the same
+seeded episodes ([camera loop](docs/results_camera.md)). Joint angles still come from the
+simulator, as encoders would provide them. A policy learned end-to-end from pixels is at 43%.
 
 ## Generalization benchmark (Stage 7)
 
@@ -64,8 +65,7 @@ flowchart LR
     T["Typed instruction"] --> PR["Parser (GRU)"] --> PL["Task planner<br/>validate · monitor · retry"]
     CAM["RGB-D camera"] --> LOC["Colour + depth<br/>localization"]
     PL --> SK
-    LOC -. "object poses (Stage 3 policies)" .-> SK
-    SIM -. "object poses (learned policies)" .-> SK
+    LOC -. "object poses, every 50 ms" .-> SK
     subgraph SK["Skills: one interface, 20 Hz"]
         direction TB
         S1["Scripted"]
@@ -114,6 +114,7 @@ rendering), PyTorch (autograd), NumPy, OpenCV, the Gymnasium interface.
 | M21 Vision-language-action fine-tuning | ⬜ Not attempted | needs a GPU and pretrained weights |
 | M22 Generalization benchmark | 🧪 Tested | 6 policies × 13 conditions × 100 episodes; `tests/test_benchmark.py` |
 | M23 Final report, demo video | ✅ Implemented | `docs/report.md`, `outputs/demo.mp4` (rendered from live simulation by `scripts/make_demo_video.py`) |
+| Camera loop for the learned policies | 🧪 Tested | `perception/tracking.py`; 6 policies × 6 conditions × 50 episodes; `tests/test_tracking.py` |
 | ROS 2 wrapper (optional) | ⬜ Not done | no engineering need in a single-process simulation |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
@@ -313,7 +314,7 @@ python scripts/language_demo.py --seed 7 --faults # recovery demo -> GIF
 python scripts/benchmark.py                       # generalization benchmark (~40 min on 2 cores)
 python scripts/benchmark_report.py                # heatmap, sweeps, tables
 python scripts/make_demo_video.py                 # outputs/demo.mp4 from live simulation (needs ffmpeg)
-pytest                                            # 163 tests
+pytest                                            # 170 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.

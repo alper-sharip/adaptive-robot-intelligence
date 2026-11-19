@@ -206,10 +206,48 @@ def tables(store, specs, labels, grid, mean) -> str:
     return "\n".join(out) + "\n"
 
 
+def camera_tables(store, cam) -> str:
+    """Camera loop vs simulator state, on the SAME seeds (the camera cells run seeds 0-49)."""
+    out = ["## Camera loop: success with cube and target from images vs from the simulator\n",
+           "Same policies, same seeds. Each cell: simulator state → cameras (episodes of 50); "
+           "change in brackets.\n",
+           "| Policy | " + " | ".join(B.CONDITIONS[c].label for c in B.CAMERA_CONDITIONS) + " |",
+           "|---|" + "---|" * len(B.CAMERA_CONDITIONS)]
+    for spec, (label, _) in B.POLICIES.items():
+        cells = []
+        for c in B.CAMERA_CONDITIONS:
+            rc, rs = cam.get(f"{spec}|cam:{c}"), store.get(f"{spec}|{c}")
+            if rc is None or rs is None:
+                cells.append("n/r")
+                continue
+            seeds = {e["seed"] for e in rc["episodes"]}
+            ks = sum(e["success"] for e in rs["episodes"] if e["seed"] in seeds)
+            kc = rc["successes"]
+            cells.append(f"{ks} → {kc} ({kc - ks:+d})")
+        out.append(f"| {label} | " + " | ".join(cells) + " |")
+    out += ["", "## Tracking accuracy (all camera episodes)\n",
+            "| Condition | Median error (mm) | 95th percentile of per-episode 95th percentile (mm) | Wrist camera | Front camera | "
+            "Moved with hand | Kept last | Target error, median (mm) |", "|---|---|---|---|---|---|---|---|"]
+    for c in B.CAMERA_CONDITIONS:
+        tr = [e["tracking"] for spec in B.POLICIES if (r := cam.get(f"{spec}|cam:{c}")) for e in r["episodes"]]
+        if not tr:
+            continue
+        src = {k: sum(t["source"][k] for t in tr) for k in ("wrist", "front", "held", "kept")}
+        tot = sum(src.values())
+        out.append(f"| {B.CONDITIONS[c].label} | {np.median([t['median_error_mm'] for t in tr]):.2f} | "
+                   f"{np.percentile([t['p95_error_mm'] for t in tr], 95):.2f} | "
+                   + " | ".join(f"{100 * src[k] / tot:.1f}%" for k in ("wrist", "front", "held", "kept"))
+                   + f" | {np.median([t['target_error_mm'] for t in tr if t['target_error_mm'] is not None]):.2f} |")
+    return "\n".join(out) + "\n"
+
+
 if __name__ == "__main__":
     store = load()
     specs, labels, grid, mean = heatmap(store, Path("outputs/benchmark_heatmap.png"))
     sweeps(store, Path("outputs/benchmark_sweeps.png"))
     text = tables(store, specs, labels, grid, mean)
+    cam_path = Path("outputs/benchmark/camera.json")
+    if cam_path.exists():
+        text += "\n" + camera_tables(store, json.loads(cam_path.read_text()))
     Path("outputs/benchmark/summary.md").write_text(text)
     print(text)

@@ -105,3 +105,27 @@ Old: steps relative to the pose when the action is applied. Fixed: relative to t
 | reactive#4cm|large | 0/100 |
 | reactive|heavy@0.2 | 0/100 |
 | outputs/models/bc_dagger.pt|heavy@0.2 | 0/100 |
+
+## Camera loop: success with cube and target from images vs from the simulator
+
+Same policies, same seeds. Each cell: simulator state → cameras (episodes of 50); change in brackets.
+
+| Policy | Nominal | Cube moved | Outside area | 3 cm cube | 5 cm cube | Latency 100 ms |
+|---|---|---|---|---|---|---|
+| Scripted (open-loop) | 50 → 50 (+0) | 0 → 0 (+0) | 50 → 50 (+0) | 50 → 50 (+0) | 50 → 50 (+0) | 50 → 50 (+0) |
+| Reactive (feedback) | 50 → 50 (+0) | 50 → 50 (+0) | 50 → 49 (-1) | 50 → 50 (+0) | 50 → 50 (+0) | 50 → 50 (+0) |
+| Clone, 100 demos | 33 → 32 (-1) | 23 → 20 (-3) | 27 → 22 (-5) | 12 → 8 (-4) | 18 → 14 (-4) | 37 → 36 (-1) |
+| Clone, 500 demos | 50 → 50 (+0) | 33 → 32 (-1) | 47 → 46 (-1) | 44 → 45 (+1) | 39 → 39 (+0) | 50 → 50 (+0) |
+| Clone + DAgger | 48 → 48 (+0) | 49 → 49 (+0) | 45 → 44 (-1) | 43 → 45 (+2) | 4 → 4 (+0) | 48 → 48 (+0) |
+| 100-demo clone + RL | 46 → 47 (+1) | 38 → 37 (-1) | 41 → 35 (-6) | 13 → 9 (-4) | 40 → 33 (-7) | 47 → 45 (-2) |
+
+## Tracking accuracy (all camera episodes)
+
+| Condition | Median error (mm) | 95th percentile of per-episode 95th percentile (mm) | Wrist camera | Front camera | Moved with hand | Kept last | Target error, median (mm) |
+|---|---|---|---|---|---|---|---|
+| Nominal | 0.51 | 15.26 | 99.3% | 0.7% | 0.0% | 0.0% | 0.88 |
+| Cube moved | 0.54 | 26.34 | 81.2% | 18.8% | 0.0% | 0.0% | 0.88 |
+| Outside area | 0.56 | 20.65 | 96.2% | 3.8% | 0.0% | 0.0% | 0.96 |
+| 3 cm cube | 0.58 | 10.83 | 97.0% | 3.0% | 0.0% | 0.0% | 0.88 |
+| 5 cm cube | 0.53 | 18.15 | 99.7% | 0.3% | 0.0% | 0.0% | 0.88 |
+| Latency 100 ms | 0.52 | 14.71 | 99.5% | 0.5% | 0.0% | 0.0% | 0.88 |

@@ -34,6 +34,7 @@ class Condition:
     offset: float = 0.0                     # m: constant error on the sensed cube position (random direction per episode)
     delay_steps: int = 0                    # actions take effect this many 50 ms steps late
     interface: str = "observed"             # what an action's step is relative to (learning/demos.py ActionExecutor)
+    camera: bool = False                    # cube and target from cameras (perception/tracking.py), not the simulator
     outside: float = 0.0                    # m: cube starts in a band this wide AROUND the training area
 
 
@@ -64,6 +65,9 @@ SWEEPS: dict[str, tuple[str, str, list]] = {
 
 def get_condition(name: str) -> Condition:
     """'jitter' -> the benchmark condition; 'jitter@0.005' -> the same perturbation at another strength."""
+    if name.startswith("cam:"):                 # the same condition, with the camera loop closed
+        base = get_condition(name[4:])
+        return replace(base, camera=True, label=f"{base.label}, camera", what=f"{base.what}; cube and target from cameras")
     if "@" not in name:
         return CONDITIONS[name]
     axis, value = name.split("@")
@@ -88,6 +92,9 @@ POLICIES: dict[str, tuple[str, str]] = {
     f"{M}/rl_residual.pt": ("100-demo clone + RL", "residual PPO on the 100-demo clone; 30% of training episodes had a moved cube"),
 }
 IMAGE_POLICY = (f"{M}/vision_cpu.pt", "Image policy", "two 64x64 cameras; cloned from the reactive policy, 200 demos")
+# The camera loop (perception/tracking.py): conditions where perception matters. Sensing jitter
+# and offset are left out: they model sensing errors, and the camera is now the sensor.
+CAMERA_CONDITIONS = ("nominal", "moved", "outside", "small", "large", "latency")
 IMAGE_CONDITIONS = ("nominal", "moved", "outside")   # a short row: each cell renders 2 cameras per step on CPU
 
 
@@ -102,6 +109,11 @@ class BenchEnv(PickPlaceEnv):
         self.cond = cond
         self._noise = np.random.default_rng(0)
         self._bias = np.zeros(2)
+        self.tracker = None
+        if cond.camera:
+            from ari.perception.tracking import CubeTracker
+
+            self.tracker = CubeTracker(self)
 
     def sample_episode(self, seed: int) -> EpisodeSpec:
         if not self.cond.outside:
@@ -121,9 +133,28 @@ class BenchEnv(PickPlaceEnv):
         self._noise = np.random.default_rng(seed + 100_000)
         ang = self._noise.uniform(0, 2 * np.pi)
         self._bias = self.cond.offset * np.array([np.cos(ang), np.sin(ang)])
-        return super().reset(seed)
+        ep = super().reset(seed)
+        if self.tracker is not None:
+            self.tracker.reset()
+        return ep
+
+    # Success is always judged on the truth, whatever the policies are told.
+    def placement_error(self) -> float:
+        return float(np.linalg.norm(self.data.xpos[self.cube_body][:2] - self.data.site_xpos[self.target_site][:2]))
+
+    def cube_yaw(self) -> float:
+        if self.tracker is not None:
+            return self.tracker.cube_yaw()
+        return super().cube_yaw()
+
+    def target_pos(self) -> np.ndarray:
+        if self.tracker is not None and self.tracker.target is not None:
+            return self.tracker.target_pos()
+        return super().target_pos()
 
     def cube_pose(self) -> np.ndarray:
+        if self.tracker is not None:
+            return self.tracker.cube_pose()
         T = super().cube_pose()
         if self.cond.jitter or self.cond.offset:
             T[:2, 3] += self._bias + self.cond.jitter * self._noise.standard_normal(2)
@@ -148,9 +179,15 @@ def _chunk(args):
     else:
         policy = make_policy(spec, env)
     # Latency sits between the policy and the arm, so it is part of the executor.
-    return [asdict(demos.rollout(env, policy, s, max_time=max_time, joint_interp=True,
+    rows = []
+    for s in seeds:
+        r = asdict(demos.rollout(env, policy, s, max_time=max_time, joint_interp=True,
                                  latency_steps=cond.delay_steps, interface=cond.interface,
-                                 disturbance=CubeShift(s) if cond.shift_cube else None)) for s in seeds]
+                                 disturbance=CubeShift(s) if cond.shift_cube else None))
+        if env.tracker is not None:
+            r["tracking"] = env.tracker.stats.summary()
+        rows.append(r)
+    return rows
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -176,6 +213,7 @@ def run_cell(spec: str, cond_name: str, seeds=range(100), workers: int = 2, max_
         "median_time_s": float(np.median([r["duration"] for r in ok])) if ok else None,
         "median_placement_mm": float(np.median([r["placement_error"] for r in ok]) * 1000) if ok else None,
         "episodes": [{"seed": r["seed"], "success": bool(r["success"]), "failure": r["failure"],
-                      "placement_mm": round(1000 * r["placement_error"], 2), "time_s": round(r["duration"], 2)}
+                      "placement_mm": round(1000 * r["placement_error"], 2), "time_s": round(r["duration"], 2),
+                      **({"tracking": r["tracking"]} if "tracking" in r else {})}
                      for r in rows],
     }

@@ -465,3 +465,43 @@ old interface by construction). The earlier one-off `latency_abs@k` cells were d
 new default reproduces them episode by episode in 11 of 12 cells; the RL policy at 100 ms
 differs by one episode (94 vs 95), probably the float32 round trip the old wrapper made
 (target -> action -> target), which the executor no longer needs.
+
+## 2026-11-18/19: Closing the camera loop
+
+Built `perception/tracking.py` (`CubeTracker`) and a `cam:` prefix for benchmark conditions.
+Results: docs/results_camera.md.
+
+### Design decided by a measurement, not a guess
+Stage 3 used the front camera from one snapshot. Before building tracking I measured both
+cameras over 6 episodes (774 steps): front 0.5 mm with the cube free but 10.3 mm with the cube
+in the hand (the hand hides the top face); wrist 0.4 mm free and 0.6 mm in the hand. So the
+wrist camera goes first. Rendering: 40 ms per 640x480 RGB-D frame without shadows or
+reflections (240 ms with them).
+
+### Bug in my own success check, caught before it mattered
+`PickPlaceEnv.placement_error()` calls `target_pos()`. Overriding `target_pos()` with the
+camera's estimate would have judged success on what the robot believes. `BenchEnv` now
+computes placement error from the true target, and a test checks it with a camera estimate
+5 cm off.
+
+### Bug: trusting a camera that sees only part of the cube
+First full run, outside-area condition: the scripted policy failed seed 14 and the reactive
+policy seed 34, both of which succeed on simulator state. At the start, the cube was at the
+edge of the wrist camera's view; it saw part of the cube and the estimate was 14-20 mm off.
+The scripted policy reads the cube once and missed. Fix: project the estimated cube's corners
+into the image and distrust a camera that cuts any of them off. First-frame error over 100
+starts: max 1.1 mm. Stopped the run halfway (2.5 h of compute lost) and repeated it, so all
+numbers come from one version of the code.
+
+### Seed 34 still fails for the reactive policy, for another reason
+Tracking within 1.1 mm throughout; the arm grasps and never lifts. The camera's height estimate
+is about 0.5 mm low throughout, so the grasp closes slightly deeper, at the near edge of the
+workspace. One episode; not investigated further.
+
+### Finding: tracking degrades only where a weak policy stalls
+The worst 5% of episodes have 15-26 mm 95th-percentile errors. Logged one (100-demo clone,
+seed 0): the open gripper hovers around the cube at grasp height without closing; the fingers
+hide part of the top face from the wrist camera and the estimate drifts from 5 to 10 mm while
+it hovers. Successful episodes: median 95th-percentile error 0.8 mm. The two policies that
+stall (100-demo clone, RL residual) are the only ones that lose on camera input: 18 and 19 of
+300 paired episodes, exact McNemar p = 0.001 and 0.003. The other four: within one episode.

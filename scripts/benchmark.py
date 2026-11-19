@@ -4,6 +4,7 @@
     python scripts/benchmark.py --sweeps        # severity sweeps (jitter, offset, latency)
     python scripts/benchmark.py --image         # the image policy (renders two cameras per step; slow)
     python scripts/benchmark.py --extras        # footnote measurements used in docs/results_stage7.md
+    python scripts/benchmark.py --camera --n 50 # cube and target from the cameras (~3 h on 2 cores)
     python scripts/benchmark.py --only nominal moved --n 20     # a quick look
 
 Results accumulate in outputs/benchmark/results.json (finished cells are skipped; --force reruns).
@@ -22,6 +23,7 @@ if __name__ == "__main__":
     p.add_argument("--sweeps", action="store_true")
     p.add_argument("--image", action="store_true")
     p.add_argument("--extras", action="store_true")
+    p.add_argument("--camera", action="store_true", help="the camera loop: cube and target from images (50 episodes per cell)")
     p.add_argument("--only", nargs="*", default=None, help="condition names")
     p.add_argument("--policies", nargs="*", default=None, help="policy specs")
     p.add_argument("--n", type=int, default=100)
@@ -36,6 +38,8 @@ if __name__ == "__main__":
                  (f"{B.M}/bc_dagger.pt", "heavy@0.2")]
         # the action interface before the latency fix, at every latency strength
         cells += [(s, f"latency_legacy@{k}") for k in (1, 2, 3, 4) for s in B.POLICIES]
+    elif args.camera:
+        cells = [(s, f"cam:{c}") for c in B.CAMERA_CONDITIONS for s in B.POLICIES]
     elif args.image:
         cells = [(B.IMAGE_POLICY[0], c) for c in B.IMAGE_CONDITIONS]
     elif args.sweeps:

@@ -40,3 +40,9 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🧪 M22 Generalization benchmark: 6 policies × 13 conditions × 100 seeded episodes, severity sweeps for sensing jitter, sensing offset and latency; the two flaws it found (latency through the action interface, the reactive policy's fixed cube size) fixed and re-measured, placement precision, failure types (docs/results_stage7.md)
 - ✅ M23 Final report (docs/report.md), demo video rendered from live simulation (outputs/demo.mp4), README front page
 - ⬜ ROS 2 wrapper (optional): not done
+
+## After the stages
+- 🧪 Latency fix: actions anchored to the observed pose; 100 ms latency now costs no policy anything (docs/results_stage7.md)
+- 🧪 Camera loop: every single-object policy on camera input, cube tracked every 50 ms (wrist camera first, front camera backup); strong policies unchanged, the two weakest lose 18-19 of 300 paired episodes (docs/results_camera.md)
+- ⬜ Perception for the multi-object / language layer
+- ⬜ Latency compensation

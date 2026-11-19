@@ -25,6 +25,7 @@ where I first drew the wrong conclusion, that is reported too (section 4).
 | Following a typed instruction among 3 cubes and 3 targets | 149/150 (parser + skill); 108-146/150 end-to-end over three seeds | [Stage 6](results_stage6.md) |
 | Two-step tasks with injected faults | 95% with result checking and a fallback skill; 35-45% without checking | [Stage 6](results_stage6.md) |
 | Generalization benchmark, 6 policies × 13 conditions × 100 episodes | no policy is best everywhere; each fails in its own way | [Stage 7](results_stage7.md) |
+| Learned policies on camera input (cube tracked from images every 50 ms) | strong policies unchanged (within 1 of 300 paired episodes); the two weakest lose 18-19 of 300 | [camera loop](results_camera.md) |
 
 The figure above is the last result and the best summary: six policies, each run on the same
 100 episodes under 13 conditions they were not trained on. Each fails in its own place, and
@@ -37,8 +38,7 @@ flowchart LR
     T["Typed instruction"] --> PR["Parser (GRU)"] --> PL["Task planner<br/>validate · monitor · retry"]
     CAM["RGB-D camera"] --> LOC["Colour + depth<br/>localization"]
     PL --> SK
-    LOC -. "object poses (Stage 3 policies)" .-> SK
-    SIM -. "object poses (learned policies)" .-> SK
+    LOC -. "object poses, every 50 ms" .-> SK
     subgraph SK["Skills: one interface, 20 Hz"]
         direction TB
         S1["Scripted"]
@@ -124,6 +124,18 @@ showed that single-condition evaluation had not:
 - **The 3 cm success tolerance hid a precision gap.** Re-scored at 1 cm, the RL policy falls
   from 93% to 35%; the scripted, reactive and 500-demo policies stay at 97-100%.
 
+### 3.2 Closing the camera loop
+
+After the benchmark, every single-object policy was given the cube and target from cameras
+instead of the simulator, re-estimated every 50 ms: the wrist camera first, the fixed front
+camera as backup ([details](results_camera.md)). On the same 300 seeded episodes per policy,
+the scripted, reactive, 500-demo and DAgger policies score within one episode of their
+simulator-state results. The two weakest policies lose 18 and 19 episodes (p < 0.01): they
+hesitate at the grasp, which is the one view where the open fingers hide part of the cube from
+the wrist camera and the estimate drifts 5-10 mm. The first full run also found a bug:
+a cube only partly in the wrist camera's view gave estimates up to 20 mm off. It was fixed and
+the run repeated.
+
 ## 4. What did not work, and what I got wrong
 
 | Item | What happened | Status |
@@ -136,6 +148,7 @@ showed that single-condition evaluation had not:
 | First held-out language split | both parsers 48.2% | explained: the split made word order irrelevant in training; redesigned |
 | "Word order cannot be learned from actions" | concluded from one seed; two more seeds learn it | **my error**, corrected in the same stage |
 | Actions relative to the pose at application time | a design choice from Stage 4 that made every policy fragile to latency | **my design flaw**, found by the benchmark; **fixed** (actions anchored to the observed pose), verified on the benchmark |
+| Trusting a camera that sees only part of the cube | estimates up to 20 mm off; one failed episode | **my oversight**, found by the first full camera run; fixed, and the run repeated |
 | Cube size as a constant in the reactive policy | 0% on a 5 cm cube | **my oversight**, found by the benchmark; **fixed**, 100% |
 | Step-response rise time | first attributed to torque saturation | **my error**; an experiment showed it is set by kd/kp |
 | Vision-language-action fine-tuning (M21) | not attempted: needs a GPU and pretrained weights | not done |
@@ -163,8 +176,10 @@ showed that single-condition evaluation had not:
   latency are modelled, and the benchmark shows the policies are sensitive to exactly the
   things simulation tends to get wrong.
 - **One object type.** Cubes on an empty table. No clutter, no occlusion, no deformables.
-- **State-based learning.** Except for the 43% image policy, learned policies read object poses
-  from the simulator. Stage 3's perception drives only the scripted and planned policies.
+- **Perception is simplified.** All single-object policies can now run on camera input
+  (tracked every step), but the cameras are simulated: perfectly calibrated, no blur or
+  distortion, a red cube on a plain table found by colour. The language and multi-object layer
+  (Stage 6) and the task monitor still use simulator positions.
 - **Small scale.** 2 CPU cores; networks of a few hundred thousand parameters; 100-500
   demonstrations; one to three training seeds per result.
 - **A generated language.** 45 words. Not open-ended English.
@@ -172,8 +187,9 @@ showed that single-condition evaluation had not:
 
 ## 7. Next steps, in order of value
 
-1. **Close the perception loop for the learned policies:** feed Stage 3's estimates (not
-   simulator poses) to the cloned and language-conditioned policies and re-run the benchmark.
+1. **Perception for the multi-object and language layer:** detect all three cubes and targets by
+   colour, so Stage 6 and its task monitor run on cameras too (the single-object policies
+   already do: [camera loop](results_camera.md)).
 2. **Latency compensation:** predict where the arm is now from the commands still in flight,
    so the fixed interface stops slowing the arm down beyond 200 ms; and re-collect
    demonstrations from the fixed reactive policy with randomized cube sizes.
@@ -188,7 +204,7 @@ showed that single-condition evaluation had not:
 
 ```bash
 pip install -e ".[dev]"            # Python 3.10+, MuJoCo, PyTorch; no GPU needed (MuJoCo Menagerie cloned next to the repo)
-pytest                              # 163 tests, about 90 s
+pytest                              # 170 tests, about 2 min
 python scripts/benchmark.py         # the matrix above, about 40 min on 2 cores
 python scripts/benchmark_report.py  # figures and tables
 python scripts/make_demo_video.py   # outputs/demo.mp4 from live simulation
