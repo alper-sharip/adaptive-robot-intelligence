@@ -204,7 +204,7 @@ the run repeated.
 
 ```bash
 pip install -e ".[dev]"            # Python 3.10+, MuJoCo, PyTorch; no GPU needed (MuJoCo Menagerie cloned next to the repo)
-pytest                              # 170 tests, about 2 min
+pytest                              # 177 tests, about 2 min
 python scripts/benchmark.py         # the matrix above, about 40 min on 2 cores
 python scripts/benchmark_report.py  # figures and tables
 python scripts/make_demo_video.py   # outputs/demo.mp4 from live simulation

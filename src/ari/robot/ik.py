@@ -64,13 +64,19 @@ def solve_ik(
     rot_tol: float = 1e-3,
     nullspace_gain: float = 0.05,
     q_preferred: np.ndarray = Q_HOME,
+    trace: list | None = None,
 ) -> IKResult:
-    """Damped-least-squares IK for the Panda TCP. Experiment with the keyword arguments."""
+    """Damped-least-squares IK for the Panda TCP. Experiment with the keyword arguments.
+
+    trace: if a list is given, each iteration appends (position error m, rotation error rad),
+    so the convergence can be inspected (used by the interactive slider tool)."""
     q = np.array(q_init, dtype=float)
     for it in range(1, max_iters + 1):
         T, J = tcp_pose_and_jacobian(q)
         e = pose_error(T_target, T)
         pos_err, rot_err = np.linalg.norm(e[:3]), np.linalg.norm(e[3:])
+        if trace is not None:
+            trace.append((float(pos_err), float(rot_err)))
         if pos_err < pos_tol and rot_err < rot_tol:
             return IKResult(q, True, it, pos_err, rot_err)
 

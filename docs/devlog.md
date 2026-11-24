@@ -505,3 +505,36 @@ hide part of the top face from the wrist camera and the estimate drifts from 5 t
 it hovers. Successful episodes: median 95th-percentile error 0.8 mm. The two policies that
 stall (100-demo clone, RL residual) are the only ones that lose on camera input: 18 and 19 of
 300 paired episodes, exact McNemar p = 0.001 and 0.003. The other four: within one episode.
+
+## 2026-11-24: Interactive slider control with live kinematics
+
+`src/ari/interactive.py` (session and math, testable without a browser),
+`src/ari/interactive_ui.html`, `scripts/slider_control.py` (local web server; physics and
+rendering on the main thread, which macOS needs for OpenGL).
+
+### "Analytical angle equations" for a 7-joint arm: only one exists, and it has two roots
+A pose fixes six numbers and the Panda has seven joints, so there is no single closed-form
+IK; the project's IK is numerical. One angle is exact anyway: the shoulder (frame 2) to wrist
+(frame 5) distance depends on joint 4 alone, so d^2 = A - 2R cos(q4 - delta). Derived from
+the DH table and checked on 5000 random postures (max error 4e-12 rad). First version of the
+check failed (0.79 rad): not the formula but the root choice. The arm is fully stretched at
+q4 = -26.8 deg, and joint 4's range contains both roots when the elbow is within about 22 deg
+of straight (27% of random postures). The interface shows both roots and says when the
+distance alone cannot decide.
+
+### The elbow swivel: biasing a joint did not work
+First attempt: pull joint 3 toward a slider value through the IK's null-space term. The elbow
+moved 0.5 deg. Near the home pose axes 1 and 3 are almost parallel, so the IK traded one for
+the other. Second version: the swivel angle itself as a null-space task (gradient by central
+differences, projected with N = I - J+J). Reaches +/-40 deg with the gripper moving under
+0.1 mm.
+
+### Two interface bugs found by driving it in headless Chrome
+1. A state computed just before a swivel command arrived told the page "swivel free", and the
+   page reset the slider; the next command would have undone the user's setting. In Cartesian
+   mode the page's own settings now win; only load, reset and mode switches read them back.
+2. FK vs MuJoCo showed 0.6 um while moving: after mj_step, MuJoCo's body positions are one
+   integration step behind the joints. `state()` now calls mj_kinematics first: 0.001 um.
+
+### The DH frames were invisible
+They sit inside the links. The arm is drawn see-through while frames are shown.

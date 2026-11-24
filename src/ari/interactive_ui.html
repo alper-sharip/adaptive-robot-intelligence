@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panda slider control · Adaptive Robot Intelligence</title>
+<style>
+:root{
+  --bg:#f4f4f1; --panel:#ffffff; --ink:#15171a; --mute:#5f636b; --faint:#8a8e96; --line:#e2e2dc; --soft:#f0f0ec;
+  --accent:#2a78d6; --accent-soft:#e4eefb; --good:#1b8a5a; --warn:#b26a00; --bad:#c0392b;
+  --x:#d23c3c; --y:#2f9e55; --z:#2f6fd6;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#111215; --panel:#1a1b1f; --ink:#ececE8; --mute:#a3a6ad; --faint:#7b7f87; --line:#2b2d33; --soft:#22242a;
+  --accent:#6ea8f0; --accent-soft:#1d2a3b; --good:#4cc38a; --warn:#e0a03c; --bad:#ef6b5d;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Inter,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
+header .sub{color:var(--mute);font-size:13px}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.pill.ok .dot{background:var(--good)} .pill.warn .dot{background:var(--warn)} .pill.bad .dot{background:var(--bad)}
+main{display:grid;grid-template-columns:minmax(520px,1.05fr) minmax(480px,1fr);gap:16px;padding:16px 20px 40px;max-width:1800px;margin:0 auto}
+@media (max-width:1150px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.card h2{font-size:13px;margin:0 0 10px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);display:flex;align-items:center;gap:10px}
+.card h2 .hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--faint);font-size:12px}
+.viewwrap{position:relative;border-radius:8px;overflow:hidden;background:#000;aspect-ratio:3/2;cursor:grab;user-select:none}
+.viewwrap:active{cursor:grabbing}
+#view{width:100%;height:100%;object-fit:cover;display:block}
+.viewbar{display:flex;gap:14px;align-items:center;margin-top:8px;color:var(--mute);font-size:12px;flex-wrap:wrap}
+.viewbar label{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tabs button{border:0;background:transparent;padding:6px 12px;color:var(--mute);font:inherit;cursor:pointer}
+.tabs button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.row{display:grid;grid-template-columns:86px 1fr 92px auto;gap:10px;align-items:center;margin:7px 0}
+.row .name{font-weight:600}
+.row .name small{display:block;font-weight:400;color:var(--faint);font-size:11px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=number]{width:92px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--soft);color:var(--ink);font:13px var(--mono);text-align:right}
+.nudge{display:inline-flex;gap:4px}
+.nudge button,.btn{border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:6px;padding:4px 9px;font:inherit;cursor:pointer;min-width:30px}
+.nudge button:hover,.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.controls-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.controls-top .lbl{color:var(--mute);font-size:12px}
+select{padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--soft);color:var(--ink);font:inherit}
+.readouts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.readout{background:var(--soft);border-radius:8px;padding:8px 10px}
+.readout .k{font-size:11px;color:var(--mute)} .readout .v{font:600 15px var(--mono)} .readout .u{font-size:11px;color:var(--faint);margin-left:2px}
+.poses{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.poses .p{display:inline-flex;gap:4px;align-items:center;background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:2px 4px 2px 8px;font-size:12px}
+.poses .p button{border:0;background:transparent;color:var(--mute);cursor:pointer;padding:2px 4px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:600;font-size:12px}
+td.l,th.l{text-align:left}
+tr.sel td{background:var(--accent-soft)}
+tbody tr{cursor:pointer}
+.mono{font-family:var(--mono)}
+.bar{height:6px;background:var(--soft);border-radius:3px;position:relative;min-width:70px}
+.bar i{position:absolute;top:-2px;width:3px;height:10px;border-radius:1px;background:var(--accent)}
+.bar.warn i{background:var(--warn)} .bar.bad i{background:var(--bad)}
+.eq{font-family:"Cambria Math","STIX Two Math","Latin Modern Math",Georgia,serif;font-size:15px;margin:6px 0 10px;line-height:1.7}
+.eq var{font-style:italic}
+.note{color:var(--mute);font-size:12.5px;margin:6px 0}
+.matrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.mat{display:inline-grid;gap:2px 10px;padding:4px 10px;position:relative;font:12.5px var(--mono)}
+.mat::before,.mat::after{content:"";position:absolute;top:0;bottom:0;width:6px;border:1.5px solid var(--ink);opacity:.7}
+.mat::before{left:0;border-right:0} .mat::after{right:0;border-left:0}
+.mat span{text-align:right;min-width:54px}
+.mat.sym span{font-family:"Cambria Math",Georgia,serif;font-size:14px;font-style:italic;min-width:60px;text-align:center}
+.mat .tr{color:var(--accent);font-weight:600}
+.matlabel{font-family:"Cambria Math",Georgia,serif;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 8px}
+.chips button{border:1px solid var(--line);background:var(--soft);color:var(--mute);border-radius:6px;padding:3px 8px;font:12px var(--mono);cursor:pointer}
+.chips button.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:13px}
+.kv .k{color:var(--mute)} .kv .v{font-family:var(--mono)}
+.ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+svg text{fill:var(--mute);font:11px system-ui}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:700px){.grid2{grid-template-columns:1fr}.readouts{grid-template-columns:repeat(2,1fr)}}
+.jac td{font:12px var(--mono);padding:3px 6px}
+.vec{font:12.5px var(--mono)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Panda slider control</h1>
+  <span class="sub">Adaptive Robot Intelligence · your kinematics, live</span>
+  <span class="spacer"></span>
+  <span class="pill" id="pill-ik"><span class="dot"></span><span>IK</span></span>
+  <span class="pill" id="pill-fk"><span class="dot"></span><span>FK check</span></span>
+  <span class="pill" id="pill-sing"><span class="dot"></span><span>Singularity</span></span>
+  <span class="pill" id="pill-conn"><span class="dot"></span><span>Connecting…</span></span>
+</header>
+
+<main>
+<section>
+  <div class="card">
+    <div class="viewwrap" id="viewwrap"><img id="view" alt="3D view of the simulated Panda arm"></div>
+    <div class="viewbar">
+      <label><input type="checkbox" id="opt-frames" checked> DH frames (x <b style="color:var(--x)">red</b>, y <b style="color:var(--y)">green</b>, z <b style="color:var(--z)">blue</b>)</label>
+      <label><input type="checkbox" id="opt-target" checked> target</label>
+      <span>Drag to orbit · scroll to zoom · shift-drag to pan</span>
+      <span class="spacer"></span>
+      <button class="btn" id="view-reset">Reset view</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="controls-top">
+      <div class="tabs" id="mode-tabs"><button data-mode="cartesian" class="on">Cartesian (IK)</button><button data-mode="joint">Joints (FK)</button></div>
+      <span class="spacer"></span>
+      <span class="lbl">Nudge step</span>
+      <select id="step"><option value="0.1">0.1 mm / 0.1°</option><option value="1" selected>1 mm / 1°</option><option value="10">10 mm / 10°</option></select>
+      <span class="lbl">Scene</span>
+      <input type="number" id="seed" value="0" min="0" step="1" style="width:64px">
+      <button class="btn" id="reset">Reset</button>
+    </div>
+
+    <div id="cart-controls"></div>
+    <div id="joint-controls" class="hidden"></div>
+
+    <div class="row">
+      <div class="name">Gripper<small>0 closed · 255 open</small></div>
+      <input type="range" id="grip" min="0" max="255" step="1" value="255">
+      <input type="number" id="grip-n" min="0" max="255" step="1" value="255">
+      <span class="nudge"><button id="grip-close">Close</button><button id="grip-open">Open</button></span>
+    </div>
+
+    <div class="readouts">
+      <div class="readout"><div class="k">Gripper → target</div><div class="v" id="r-err">–</div></div>
+      <div class="readout"><div class="k">Gripper → cube</div><div class="v" id="r-cube">–</div></div>
+      <div class="readout"><div class="k">Cube → goal (xy)</div><div class="v" id="r-goal">–</div></div>
+      <div class="readout"><div class="k">Finger opening</div><div class="v" id="r-finger">–</div></div>
+    </div>
+
+    <h2 style="margin-top:14px">Saved poses <span class="hint">stored in this browser</span></h2>
+    <div class="controls-top"><input id="pose-name" placeholder="name, e.g. above cube" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--soft);color:var(--ink);font:inherit"><button class="btn" id="pose-save">Save current</button></div>
+    <div class="poses" id="poses"></div>
+  </div>
+</section>
+
+<section>
+  <div class="card">
+    <h2>Modified DH parameters <span class="hint">Craig convention · θ<sub>i</sub> = q<sub>i</sub>, live · click a row to inspect that link</span></h2>
+    <table id="dh">
+      <thead><tr><th class="l">i</th><th>a<sub>i−1</sub> (m)</th><th>α<sub>i−1</sub></th><th>d<sub>i</sub> (m)</th><th>θ<sub>i</sub> (deg)</th><th>θ<sub>i</sub> (rad)</th><th class="l">within limits</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="note">Plus two fixed transforms: flange <span class="mono">d = 0.107 m</span>, hand turned <span class="mono">−45°</span>; tool centre point <span class="mono">0.1034 m</span> further along z.</p>
+  </div>
+
+  <div class="card">
+    <h2>Link transform <span class="hint">frame i−1 → frame i</span></h2>
+    <div class="eq"><var>T</var><sub><var>i</var>−1,<var>i</var></sub> = Rot<sub>x</sub>(<var>α</var><sub><var>i</var>−1</sub>) · Trans<sub>x</sub>(<var>a</var><sub><var>i</var>−1</sub>) · Rot<sub>z</sub>(<var>θ</var><sub><var>i</var></sub>) · Trans<sub>z</sub>(<var>d</var><sub><var>i</var></sub>)</div>
+    <div class="matrow">
+      <span class="matlabel">=</span>
+      <div class="mat sym" style="grid-template-columns:repeat(4,auto)">
+        <span>cθ</span><span>−sθ</span><span>0</span><span>a</span>
+        <span>sθ cα</span><span>cθ cα</span><span>−sα</span><span>−d sα</span>
+        <span>sθ sα</span><span>cθ sα</span><span>cα</span><span>d cα</span>
+        <span>0</span><span>0</span><span>0</span><span>1</span>
+      </div>
+    </div>
+    <div class="chips" id="link-chips"></div>
+    <div class="matrow"><span class="matlabel" id="link-label"></span><div class="mat" id="link-mat" style="grid-template-columns:repeat(4,auto)"></div><div class="note" id="link-subst" style="max-width:260px"></div></div>
+    <div class="matrow"><span class="matlabel" id="cum-label"></span><div class="mat" id="cum-mat" style="grid-template-columns:repeat(4,auto)"></div><div class="note">Product of every link up to this frame: where frame <span id="cum-i"></span> is in the world. Its last column is the joint's position; its third column is the joint's rotation axis.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Forward kinematics, end to end</h2>
+    <div class="eq"><sup>0</sup><var>T</var><sub>TCP</sub> = <var>T</var><sub>01</sub> <var>T</var><sub>12</sub> <var>T</var><sub>23</sub> <var>T</var><sub>34</sub> <var>T</var><sub>45</sub> <var>T</var><sub>56</sub> <var>T</var><sub>67</sub> · <var>T</var><sub>7,flange</sub> · <var>T</var><sub>flange,TCP</sub></div>
+    <div class="grid2">
+      <div><div class="note">Your FK (from the DH table)</div><div class="mat" id="fk-mat" style="grid-template-columns:repeat(4,auto)"></div></div>
+      <div><div class="note">MuJoCo, measured</div><div class="mat" id="mj-mat" style="grid-template-columns:repeat(4,auto)"></div></div>
+    </div>
+    <p class="note">Difference in tool position: <b class="mono" id="fk-diff">–</b>. Two independent descriptions of the same robot agree.</p>
+  </div>
+
+  <div class="card">
+    <h2>Inverse kinematics, as it runs <span class="hint">damped least squares, warm-started from the last solution</span></h2>
+    <div class="eq">Δ<var>q</var> = <var>J</var><sup>T</sup> ( <var>J J</var><sup>T</sup> + <var>λ</var><sup>2</sup><var>I</var> )<sup>−1</sup> <var>e</var>   +   <var>N</var> · (posture task),     <var>N</var> = <var>I</var> − <var>J</var><sup>+</sup><var>J</var></div>
+    <div class="kv">
+      <span class="k">λ (damping)</span><span class="v" id="ik-lambda">–</span>
+      <span class="k">e = pose error [x y z (mm) · rx ry rz (deg)]</span><span class="v" id="ik-e">–</span>
+      <span class="k">Δq for that error (deg)</span><span class="v" id="ik-dq">–</span>
+      <span class="k">Last solve</span><span class="v" id="ik-sum">–</span>
+    </div>
+    <svg id="ik-plot" viewBox="0 0 520 120" width="100%" height="120" aria-label="IK convergence: position error per iteration, log scale"></svg>
+    <p class="note">Each point is one iteration of the last solve. The solver stops below 0.1 mm and 0.06°.</p>
+  </div>
+
+  <div class="card">
+    <h2>Jacobian <span class="hint">[v; ω] = J q̇ · column i = [z<sub>i</sub> × (p − o<sub>i</sub>); z<sub>i</sub>]</span></h2>
+    <table class="jac" id="jac"></table>
+    <div class="kv" style="margin-top:8px">
+      <span class="k">Singular values</span><span class="v" id="sv">–</span>
+      <span class="k">Manipulability (product)</span><span class="v" id="manip">–</span>
+      <span class="k">Condition number</span><span class="v" id="cond">–</span>
+    </div>
+    <p class="note">A singular value near zero means one direction the gripper cannot move in: a singularity. The damping λ keeps the IK step finite there.</p>
+  </div>
+
+  <div class="card">
+    <h2>The one closed-form angle: the elbow</h2>
+    <p class="note">The shoulder (frame 2) to wrist (frame 5) distance depends on joint 4 alone, so the law of cosines gives it exactly:</p>
+    <div class="eq"><var>d</var><sup>2</sup> = <var>A</var> − 2<var>R</var> cos(<var>q</var><sub>4</sub> − <var>δ</var>)   ⇒   <var>q</var><sub>4</sub> = <var>δ</var> ± arccos( (<var>A</var> − <var>d</var><sup>2</sup>) / 2<var>R</var> )</div>
+    <div class="kv">
+      <span class="k">Constants from the DH table</span><span class="v" id="el-const">–</span>
+      <span class="k">d, measured from your FK</span><span class="v" id="el-d">–</span>
+      <span class="k">(A − d²) / 2R</span><span class="v" id="el-c">–</span>
+      <span class="k">Roots</span><span class="v" id="el-roots">–</span>
+      <span class="k">Actual q<sub>4</sub></span><span class="v" id="el-actual">–</span>
+    </div>
+    <p class="note" id="el-note"></p>
+    <h2 style="margin-top:14px">The 7th joint: elbow swivel</h2>
+    <p class="note">The other six angles have no single closed form: a pose fixes six numbers and the arm has seven joints, so the elbow can swing around the shoulder–wrist line without moving the gripper. Try the swivel slider: the gripper stays put while the arm moves.</p>
+    <div class="kv"><span class="k">Swivel angle ψ, now</span><span class="v" id="swivel">–</span></div>
+  </div>
+</section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const DEG = 180 / Math.PI;
+let S = null;                // latest state from the server
+let mode = "cartesian";
+let selLink = 3;             // which link transform to show (1..7, 8 = flange, 9 = TCP)
+let dragging = false;        // user is moving a slider: do not overwrite it from the server
+let cam = {az:145, el:-25, dist:1.6, lx:0.45, ly:0.0, lz:0.2};
+const CAM0 = {...cam};
+
+// ---------------------------------------------------------------- controls
+const CART = [
+  {k:"x", label:"x", unit:"mm", min:250, max:750, step:0.1, color:"var(--x)"},
+  {k:"y", label:"y", unit:"mm", min:-400, max:400, step:0.1, color:"var(--y)"},
+  {k:"z", label:"z", unit:"mm", min:15, max:650, step:0.1, color:"var(--z)"},
+  {k:"yaw", label:"yaw", unit:"deg", min:-180, max:180, step:0.1},
+  {k:"swivel", label:"elbow swivel", unit:"deg", min:-120, max:120, step:0.1, free:true},
+];
+function sliderRow(id, label, unit, min, max, step, color, extra="") {
+  return `<div class="row">
+    <div class="name" ${color ? `style="color:${color}"` : ""}>${label}<small>${unit}${extra}</small></div>
+    <input type="range" id="${id}" min="${min}" max="${max}" step="${step}">
+    <input type="number" id="${id}-n" min="${min}" max="${max}" step="${step}">
+    <span class="nudge"><button data-for="${id}" data-dir="-1">−</button><button data-for="${id}" data-dir="1">+</button></span>
+  </div>`;
+}
+$("cart-controls").innerHTML = CART.map(c => sliderRow("c-" + c.k, c.label, c.unit, c.min, c.max, c.step, c.color,
+  c.free ? ` · <label style="cursor:pointer"><input type="checkbox" id="swivel-free" checked> free</label>` : "")).join("");
+$("joint-controls").innerHTML = [...Array(7).keys()].map(i =>
+  sliderRow("j-" + i, `q<sub>${i+1}</sub>`, "deg", -180, 215, 0.1, null)).join("");
+
+let pending = null, sending = false;
+function send(cmd) {          // coalesce: at most one request in flight, always the newest command
+  pending = cmd;
+  if (sending) return;
+  sending = true;
+  const go = () => {
+    const c = pending; pending = null;
+    fetch("/cmd", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(c)})
+      .catch(() => {}).finally(() => { if (pending) go(); else sending = false; });
+  };
+  go();
+}
+function cartCmd(extra = {}) {
+  const c = {type:"cartesian"};
+  for (const k of ["x","y","z","yaw"]) c[k] = parseFloat($("c-" + k).value);
+  c.gripper = parseFloat($("grip").value);
+  if ($("swivel-free").checked) c.free_swivel = true; else c.swivel = parseFloat($("c-swivel").value);
+  return Object.assign(c, extra);
+}
+function jointCmd() {
+  return {type:"joint", q:[...Array(7).keys()].map(i => parseFloat($("j-" + i).value)), gripper:parseFloat($("grip").value)};
+}
+function current() { return mode === "cartesian" ? cartCmd() : jointCmd(); }
+
+function wire(id, onChange) {
+  const r = $(id), n = $(id + "-n");
+  r.addEventListener("input", () => { n.value = (+r.value).toFixed(1); onChange(); });
+  r.addEventListener("pointerdown", () => dragging = true);
+  window.addEventListener("pointerup", () => dragging = false);
+  n.addEventListener("change", () => { r.value = n.value; onChange(); });
+  n.addEventListener("focus", () => dragging = true);
+  n.addEventListener("blur", () => dragging = false);
+}
+for (const c of CART) wire("c-" + c.k, () => {
+  if (c.k === "swivel") $("swivel-free").checked = false;
+  send(cartCmd());
+});
+for (let i = 0; i < 7; i++) wire("j-" + i, () => send(jointCmd()));
+$("swivel-free").addEventListener("change", () => send(cartCmd()));
+wire("grip", () => send(mode === "cartesian" ? cartCmd() : jointCmd()));
+$("grip-close").onclick = () => { $("grip").value = 0; $("grip-n").value = 0; send(current()); };
+$("grip-open").onclick = () => { $("grip").value = 255; $("grip-n").value = 255; send(current()); };
+
+document.querySelectorAll(".nudge button[data-for]").forEach(b => b.addEventListener("click", () => {
+  const r = $(b.dataset.for), step = parseFloat($("step").value) * (+b.dataset.dir);
+  r.value = Math.min(+r.max, Math.max(+r.min, +r.value + step));
+  $(b.dataset.for + "-n").value = (+r.value).toFixed(1);
+  if (b.dataset.for === "c-swivel") $("swivel-free").checked = false;
+  send(current());
+}));
+
+document.querySelectorAll("#mode-tabs button").forEach(b => b.addEventListener("click", () => {
+  mode = b.dataset.mode;
+  document.querySelectorAll("#mode-tabs button").forEach(x => x.classList.toggle("on", x === b));
+  $("cart-controls").classList.toggle("hidden", mode !== "cartesian");
+  $("joint-controls").classList.toggle("hidden", mode !== "joint");
+  syncSliders(true);
+  send(current());
+}));
+$("reset").onclick = () => send({type:"reset", seed: parseInt($("seed").value || "0")});
+
+// keyboard: arrows move x/y, page up/down move z (cartesian mode), using the nudge step
+window.addEventListener("keydown", (ev) => {
+  if (mode !== "cartesian" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT") return;
+  const map = {ArrowUp:["c-x",1], ArrowDown:["c-x",-1], ArrowLeft:["c-y",1], ArrowRight:["c-y",-1], PageUp:["c-z",1], PageDown:["c-z",-1]};
+  const m = map[ev.key]; if (!m) return;
+  ev.preventDefault();
+  const r = $(m[0]); r.value = +r.value + m[1] * parseFloat($("step").value); $(m[0] + "-n").value = (+r.value).toFixed(1);
+  send(cartCmd());
+});
+
+// saved poses
+function loadPoses() { try { return JSON.parse(localStorage.getItem("ari-poses") || "[]"); } catch { return []; } }
+function savePoses(p) { try { localStorage.setItem("ari-poses", JSON.stringify(p)); } catch {} }
+function drawPoses() {
+  const p = loadPoses();
+  $("poses").innerHTML = p.length ? p.map((x, i) => `<span class="p">${x.name}<button data-go="${i}" title="go">▶</button><button data-del="${i}" title="delete">✕</button></span>`).join("")
+    : `<span class="note">None yet. Save one, e.g. "above cube", "grasp", "place".</span>`;
+  $("poses").querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+    const x = loadPoses()[+b.dataset.go];
+    for (const k of ["x","y","z","yaw"]) { $("c-" + k).value = x[k]; $("c-" + k + "-n").value = (+x[k]).toFixed(1); }
+    $("grip").value = x.gripper; $("grip-n").value = x.gripper;
+    if (mode !== "cartesian") document.querySelector('#mode-tabs button[data-mode="cartesian"]').click();
+    send(cartCmd());
+  });
+  $("poses").querySelectorAll("[data-del]").forEach(b => b.onclick = () => { const p = loadPoses(); p.splice(+b.dataset.del, 1); savePoses(p); drawPoses(); });
+}
+$("pose-save").onclick = () => {
+  if (!S) return;
+  const t = S.target, p = loadPoses();
+  p.push({name: $("pose-name").value.trim() || `pose ${p.length + 1}`, x: t.x*1000, y: t.y*1000, z: t.z*1000, yaw: t.yaw*DEG, gripper: t.gripper});
+  savePoses(p); $("pose-name").value = ""; drawPoses();
+};
+drawPoses();
+
+// ---------------------------------------------------------------- 3D view
+const img = $("view");
+let frameErrors = 0;
+function frameURL() {
+  const q = new URLSearchParams({...cam, frames: $("opt-frames").checked ? 1 : 0, target: $("opt-target").checked ? 1 : 0,
+    sel: selLink <= 7 ? selLink : (selLink === 9 ? 8 : -1), t: Date.now()});
+  return "/frame?" + q;
+}
+img.onload = () => { frameErrors = 0; requestAnimationFrame(() => img.src = frameURL()); };
+img.onerror = () => { frameErrors++; setTimeout(() => img.src = frameURL(), Math.min(2000, 200 * frameErrors)); };
+img.src = frameURL();
+let drag = null;
+$("viewwrap").addEventListener("pointerdown", (e) => { drag = {x:e.clientX, y:e.clientY, pan:e.shiftKey}; e.target.setPointerCapture(e.pointerId); });
+$("viewwrap").addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.pan) {
+    const a = cam.az / DEG, s = cam.dist * 0.0015;
+    cam.lx += s * (dx * Math.sin(a) + dy * Math.cos(a) * 0.5); cam.ly += s * (-dx * Math.cos(a) + dy * Math.sin(a) * 0.5);
+  } else { cam.az -= dx * 0.4; cam.el = Math.max(-89, Math.min(10, cam.el - dy * 0.3)); }
+});
+window.addEventListener("pointerup", () => drag = null);
+$("viewwrap").addEventListener("wheel", (e) => { e.preventDefault(); cam.dist = Math.max(0.4, Math.min(4, cam.dist * (1 + e.deltaY * 0.001))); }, {passive:false});
+$("view-reset").onclick = () => cam = {...CAM0};
+
+// ---------------------------------------------------------------- math panels
+const f = (x, d = 4) => (Math.abs(x) < 0.5 * Math.pow(10, -d) ? 0 : x).toFixed(d);
+function mat(el, M, d = 4, highlightCol = 3) {
+  el.innerHTML = M.map(r => r.map((v, j) => `<span class="${j === highlightCol ? "tr" : ""}">${f(v, d)}</span>`).join("")).join("");
+}
+const LINKNAMES = ["T₀₁","T₁₂","T₂₃","T₃₄","T₄₅","T₅₆","T₆₇","T₇,flange","T_flange,TCP"];
+$("link-chips").innerHTML = LINKNAMES.map((n, i) => `<button data-l="${i+1}">${n}</button>`).join("");
+$("link-chips").querySelectorAll("button").forEach(b => b.onclick = () => { selLink = +b.dataset.l; drawMath(); });
+
+function syncSliders(force = false) {
+  if (!S || (dragging && !force)) return;
+  const t = S.target;
+  const vals = {x: t.x*1000, y: t.y*1000, z: t.z*1000, yaw: t.yaw*DEG};
+  if (mode === "cartesian" && !force) { /* the sliders are the source of truth while in this mode */ }
+  else for (const k in vals) { $("c-" + k).value = vals[k]; $("c-" + k + "-n").value = vals[k].toFixed(1); }
+  // Swivel: the page's own setting wins in Cartesian mode (a state computed just before a command
+  // arrives would otherwise undo it). Only a forced sync (load, reset, mode switch) reads it back.
+  if (force) {
+    const free = t.swivel === null || t.swivel === undefined;
+    $("swivel-free").checked = free;
+    const v = free ? S.swivel_deg : t.swivel;
+    $("c-swivel").value = v; $("c-swivel-n").value = v.toFixed(1);
+  } else if ($("swivel-free").checked) {     // free: show where the IK has put the elbow
+    $("c-swivel").value = S.swivel_deg; $("c-swivel-n").value = S.swivel_deg.toFixed(1);
+  }
+  if (mode === "joint" && !force) return;
+  S.q_cmd.forEach((v, i) => { $("j-" + i).value = v*DEG; $("j-" + i + "-n").value = (v*DEG).toFixed(1); });
+  S.limits.forEach((lim, i) => { $("j-" + i).min = (lim[0]*DEG).toFixed(1); $("j-" + i).max = (lim[1]*DEG).toFixed(1); });
+}
+
+function drawMath() {
+  if (!S) return;
+  // DH table
+  const rows = S.dh.map((r, i) => {
+    const lim = S.limits[i], frac = (r.theta - lim[0]) / (lim[1] - lim[0]), margin = S.limit_margin_deg[i];
+    const cls = margin < 5 ? "bad" : margin < 15 ? "warn" : "";
+    return `<tr data-l="${r.i}" class="${selLink === r.i ? "sel" : ""}"><td class="l">${r.i}</td><td class="mono">${f(r.a, 4)}</td>
+      <td class="mono">${r.alpha === 0 ? "0" : (r.alpha > 0 ? "π/2" : "−π/2")}</td><td class="mono">${f(r.d, 3)}</td>
+      <td class="mono"><b>${(r.theta*DEG).toFixed(2)}</b></td><td class="mono">${r.theta.toFixed(4)}</td>
+      <td class="l"><div class="bar ${cls}" title="${margin.toFixed(1)}° from the nearest limit"><i style="left:calc(${(frac*100).toFixed(1)}% - 1px)"></i></div></td></tr>`;
+  }).join("");
+  $("dh").querySelector("tbody").innerHTML = rows;
+  $("dh").querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { selLink = +tr.dataset.l; drawMath(); });
+
+  // link transform
+  $("link-chips").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.l === selLink));
+  let M, label, subst = "";
+  if (selLink <= 7) {
+    const r = S.dh[selLink - 1]; M = S.links[selLink - 1]; label = LINKNAMES[selLink - 1] + " =";
+    subst = `θ = ${(r.theta*DEG).toFixed(2)}° · α = ${r.alpha === 0 ? "0" : (r.alpha > 0 ? "90°" : "−90°")} · a = ${f(r.a, 4)} m · d = ${f(r.d, 3)} m<br>
+      cθ = ${Math.cos(r.theta).toFixed(4)}, sθ = ${Math.sin(r.theta).toFixed(4)}, cα = ${f(Math.cos(r.alpha), 0)}, sα = ${f(Math.sin(r.alpha), 0)}`;
+  } else if (selLink === 8) { M = S.flange; label = "T₇,flange ="; subst = "fixed: 0.107 m along z, then −45° about z (how the hand is mounted)"; }
+  else { M = S.tcp_offset; label = "T_flange,TCP ="; subst = "fixed: 0.1034 m along z, to the point between the fingertips"; }
+  $("link-label").textContent = label; mat($("link-mat"), M); $("link-subst").innerHTML = subst;
+  const ci = Math.min(selLink, 7);
+  const C = selLink <= 7 ? S.frames[selLink - 1] : S.T_fk;
+  $("cum-label").innerHTML = selLink <= 7 ? `<sup>0</sup>T<sub>${ci}</sub> =` : `<sup>0</sup>T<sub>TCP</sub> =`;
+  $("cum-i").textContent = selLink <= 7 ? ci : "TCP";
+  mat($("cum-mat"), C);
+
+  // FK end to end
+  mat($("fk-mat"), S.T_fk); mat($("mj-mat"), S.T_mujoco);
+  $("fk-diff").textContent = S.fk_vs_mujoco_um < 0.001 ? "below 0.001 µm" : `${S.fk_vs_mujoco_um.toFixed(3)} µm`;
+
+  // IK
+  const ik = S.ik;
+  $("ik-lambda").textContent = S.damping;
+  $("ik-e").textContent = "[" + ik.e.slice(0,3).map(v => f(v*1000, 3)).join(" ") + " · " + ik.e.slice(3).map(v => f(v*DEG, 3)).join(" ") + "]";
+  $("ik-dq").textContent = "[" + ik.dq.map(v => f(v*DEG, 3)).join(" ") + "]";
+  $("ik-sum").innerHTML = `${ik.iterations} iteration${ik.iterations === 1 ? "" : "s"} · residual ${ik.pos_error_mm.toFixed(4)} mm, ${ik.rot_error_deg.toFixed(4)}° · ` +
+    (ik.success ? `<span class="ok">converged</span>` : `<span class="bad">did not converge: target out of reach?</span>`);
+  drawPlot(ik.trace);
+
+  // Jacobian
+  const rowsJ = ["vₓ","v_y","v_z","ωₓ","ω_y","ω_z"];
+  const maxAbs = Math.max(...S.jacobian.flat().map(Math.abs));
+  $("jac").innerHTML = `<tr><th></th>${[...Array(7).keys()].map(i => `<th>q${i+1}</th>`).join("")}</tr>` + S.jacobian.map((r, i) =>
+    `<tr><th class="l">${rowsJ[i]}</th>${r.map(v => `<td style="background:color-mix(in srgb, var(--accent) ${Math.round(28*Math.abs(v)/maxAbs)}%, transparent)">${f(v, 3)}</td>`).join("")}</tr>`).join("");
+  $("sv").textContent = S.singular_values.map(v => v.toFixed(3)).join("  ");
+  $("manip").textContent = S.manipulability.toExponential(3);
+  $("cond").innerHTML = S.condition.toFixed(1) + (S.condition > 50 ? ` <span class="warn">(near a singularity)</span>` : "");
+
+  // elbow
+  const E = S.elbow;
+  $("el-const").textContent = `A = ${E.A.toFixed(5)} m²,  R = ${E.R.toFixed(5)} m²,  δ = ${(E.delta*DEG).toFixed(2)}°`;
+  $("el-d").textContent = `${(E.d*1000).toFixed(2)} mm   (d² = ${(E.d*E.d).toFixed(5)} m²)`;
+  $("el-c").textContent = E.cos_term.toFixed(5);
+  $("el-roots").innerHTML = E.roots.map(r => {
+    const inside = E.roots_in_range.some(x => Math.abs(x - r) < 1e-9), match = Math.abs(r - E.q4_actual) < 1e-6;
+    return `<span class="${match ? "ok" : ""}" style="${inside ? "" : "opacity:.45"}">${(r*DEG).toFixed(3)}°${inside ? "" : " (outside range)"}${match ? " ✓" : ""}</span>`;
+  }).join("   ");
+  $("el-actual").textContent = `${(E.q4_actual*DEG).toFixed(3)}°`;
+  $("el-note").innerHTML = E.ambiguous
+    ? `<span class="warn">Both roots are within joint 4's range.</span> The arm is fully stretched at ${(E.q4_straight*DEG).toFixed(1)}°; close to that, two elbow angles give the same distance, and the distance alone cannot say which one the arm is in.`
+    : `Only one root is within joint 4's range [−176°, −4°], so the distance gives the elbow angle uniquely.`;
+  $("swivel").textContent = `${S.swivel_deg.toFixed(2)}°` + (S.target.swivel === null ? "  (free: the IK chooses)" : `  (target ${S.target.swivel.toFixed(1)}°)`);
+}
+
+function drawPlot(trace) {
+  const W = 520, H = 120, L = 46, B = 22, svg = $("ik-plot");
+  if (!trace.length) { svg.innerHTML = ""; return; }
+  const ys = trace.map(t => Math.max(t[0], 1e-4)), lo = -4, hi = Math.max(2, Math.ceil(Math.log10(Math.max(...ys))));
+  const X = (i) => L + (trace.length === 1 ? 0 : i * (W - L - 10) / (trace.length - 1));
+  const Y = (v) => 8 + (hi - Math.log10(v)) * (H - B - 8) / (hi - lo);
+  let g = "";
+  for (let e = lo; e <= hi; e += 2) g += `<line x1="${L}" x2="${W-10}" y1="${Y(10**e)}" y2="${Y(10**e)}" stroke="var(--line)"/><text x="${L-6}" y="${Y(10**e)+4}" text-anchor="end">${e >= 0 ? 10**e : "1e" + e} mm</text>`;
+  g += `<line x1="${L}" x2="${W-10}" y1="${Y(0.1)}" y2="${Y(0.1)}" stroke="var(--good)" stroke-dasharray="4 3"/><text x="${W-12}" y="${Y(0.1)-4}" text-anchor="end">tolerance 0.1 mm</text>`;
+  g += `<polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${ys.map((v, i) => `${X(i)},${Y(v)}`).join(" ")}"/>`;
+  g += ys.map((v, i) => `<circle cx="${X(i)}" cy="${Y(v)}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="1.5"><title>iteration ${i+1}: ${v.toFixed(4)} mm</title></circle>`).join("");
+  g += `<text x="${(L + W) / 2}" y="${H - 4}" text-anchor="middle">iteration (1 … ${trace.length})</text>`;
+  svg.innerHTML = g;
+}
+
+function drawStatus() {
+  const set = (id, cls, text) => { $(id).className = "pill " + cls; $(id).lastElementChild.textContent = text; };
+  set("pill-conn", "ok", "Live");
+  set("pill-ik", S.ik.success ? "ok" : "bad", S.ik.success ? `IK ${S.ik.pos_error_mm.toFixed(3)} mm` : "IK: out of reach");
+  set("pill-fk", S.fk_vs_mujoco_um < 1 ? "ok" : "warn", `FK = MuJoCo ±${Math.max(S.fk_vs_mujoco_um, 0.001).toFixed(3)} µm`);
+  set("pill-sing", S.condition > 50 ? "warn" : "ok", `κ = ${S.condition.toFixed(0)}`);
+  $("r-err").innerHTML = `${S.tcp_error_to_target_mm.toFixed(2)}<span class="u">mm</span>`;
+  $("r-cube").innerHTML = `${S.cube.tcp_to_cube_mm.toFixed(1)}<span class="u">mm</span>`;
+  $("r-goal").innerHTML = `${S.goal.cube_to_goal_mm.toFixed(1)}<span class="u">mm</span>`;
+  $("r-finger").innerHTML = `${S.finger_width_mm.toFixed(1)}<span class="u">mm</span>`;
+}
+
+// ---------------------------------------------------------------- state loop
+let first = true, lastSeed = null;
+async function poll() {
+  try {
+    const r = await fetch("/state", {cache:"no-store"});
+    S = await r.json();
+    if (S.q) {
+      if (first || S.seed !== lastSeed) { syncSliders(true); first = false; lastSeed = S.seed; $("grip").value = S.target.gripper; $("grip-n").value = S.target.gripper; }
+      else syncSliders();
+      drawStatus(); drawMath();
+    }
+  } catch { const p = $("pill-conn"); p.className = "pill bad"; p.lastElementChild.textContent = "Disconnected"; }
+  setTimeout(poll, 100);
+}
+poll();
+</script>
+</body>
+</html>

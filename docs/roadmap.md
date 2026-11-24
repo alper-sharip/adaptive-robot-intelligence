@@ -46,3 +46,4 @@ Status legend: ⬜ Planned · 🟨 In progress · ✅ Implemented · 🧪 Tested
 - 🧪 Camera loop: every single-object policy on camera input, cube tracked every 50 ms (wrist camera first, front camera backup); strong policies unchanged, the two weakest lose 18-19 of 300 paired episodes (docs/results_camera.md)
 - ⬜ Perception for the multi-object / language layer
 - ⬜ Latency compensation
+- ✅ Interactive slider control with live kinematics: DH table, link transforms, FK checked against MuJoCo, IK convergence, Jacobian, closed-form elbow angle, elbow swivel in the null space (scripts/slider_control.py)

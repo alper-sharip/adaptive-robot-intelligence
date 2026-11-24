@@ -58,6 +58,28 @@ severity sweeps and limits: [`docs/results_stage7.md`](docs/results_stage7.md).
 - **Friction 0.5 is a hardware limit:** the gripper's 1 N per finger cannot hold the cube, for
   any policy. A stiffer gripper restores them.
 
+## Interactive: move the arm, watch the math
+
+![slider control](outputs/slider_control.png)
+
+```bash
+python scripts/slider_control.py      # opens http://localhost:8765
+```
+
+Drag sliders for the gripper's x, y, z and yaw (to 0.1 mm), and the project's own IK solves
+all seven joints live. Or switch to joint mode and drive the joints directly. Beside the 3D
+view, updating as it moves:
+
+- the modified DH table with live joint angles and joint-limit margins;
+- every link transform, as the general formula and with current numbers, and the chained
+  product down to the gripper, checked against MuJoCo (agreement to 0.001 µm);
+- the IK as it runs: the damped-least-squares update with live values, the convergence of each
+  solve, the Jacobian, its singular values and how close the arm is to a singularity;
+- the one joint angle the Panda's geometry gives in closed form (the elbow, from the law of
+  cosines), with both roots and where they become ambiguous;
+- an elbow-swivel slider: the seventh joint's freedom, solved in the null space, so the elbow
+  swings while the gripper holds still (moves under 0.1 mm).
+
 ## How it fits together
 
 ```mermaid
@@ -311,10 +333,11 @@ python scripts/evaluate_language.py m19           # one instruction per episode,
 python scripts/evaluate_language.py m20           # two-step tasks, with and without faults
 python scripts/language_demo.py "put the red cube on the green target, then move the yellow cube to the blue target"
 python scripts/language_demo.py --seed 7 --faults # recovery demo -> GIF
+python scripts/slider_control.py                  # interactive sliders + live kinematics, in your browser
 python scripts/benchmark.py                       # generalization benchmark (~40 min on 2 cores)
 python scripts/benchmark_report.py                # heatmap, sweeps, tables
 python scripts/make_demo_video.py                 # outputs/demo.mp4 from live simulation (needs ffmpeg)
-pytest                                            # 170 tests
+pytest                                            # 177 tests
 ```
 
 If Menagerie is somewhere else: `export ARI_MENAGERIE=/path/to/mujoco_menagerie`.
