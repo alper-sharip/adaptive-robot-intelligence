@@ -1,0 +1,26 @@
+{
+ "held_offset_mm": [
+  -0.01941498447235767,
+  -9.733839577727876
+ ],
+ "placed_offset_mm": [
+  0.7321486316391002,
+  -5.480419022704301
+ ],
+ "uncalibrated": {
+  "success": 100,
+  "episodes": 100,
+  "failures": {},
+  "placement_median_mm": 5.623324739120591,
+  "placement_p95_mm": 7.856712505521741,
+  "placement_max_mm": 9.344566200342895
+ },
+ "calibrated": {
+  "success": 100,
+  "episodes": 100,
+  "failures": {},
+  "placement_median_mm": 2.00198043384343,
+  "placement_p95_mm": 4.053532658361691,
+  "placement_max_mm": 11.308210802237353
+ }
+}

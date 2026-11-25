@@ -80,6 +80,21 @@ view, updating as it moves:
 - an elbow-swivel slider: the seventh joint's freedom, solved in the null space, so the elbow
   swings while the gripper holds still (moves under 0.1 mm).
 
+## Next: the SO-101, built in simulation first
+
+![SO-101 pick-and-place](outputs/so101/so101_pick_place.gif)
+
+The low-cost hardware arm this project will move to (LeRobot's SO-101), modelled before buying
+it: my own FK (matches MuJoCo to 2e-15 m) and a closed-form top-down IK (exact), then 100/100
+scripted pick-and-place. It found a hardware trait the Franka never had: the **one-sided gripper
+pushes the cube 9.8 mm** at every grasp. A one-episode calibration cuts the median placement
+error from 5.6 to 2.0 mm. Plus a checklist of what to measure on the real arm and where each
+number plugs in: [`docs/results_so101.md`](docs/results_so101.md).
+
+```bash
+python scripts/so101_demo.py      # calibrate, 100 episodes, GIF
+```
+
 ## How it fits together
 
 ```mermaid
@@ -137,6 +152,7 @@ rendering), PyTorch (autograd), NumPy, OpenCV, the Gymnasium interface.
 | M22 Generalization benchmark | 🧪 Tested | 6 policies × 13 conditions × 100 episodes; `tests/test_benchmark.py` |
 | M23 Final report, demo video | ✅ Implemented | `docs/report.md`, `outputs/demo.mp4` (rendered from live simulation by `scripts/make_demo_video.py`) |
 | Camera loop for the learned policies | 🧪 Tested | `perception/tracking.py`; 6 policies × 6 conditions × 50 episodes; `tests/test_tracking.py` |
+| SO-101 in simulation (closed-form IK, pick-and-place, gripper calibration) | 🧪 Tested | `src/ari/so101/`; 100/100; `tests/test_so101.py` |
 | ROS 2 wrapper (optional) | ⬜ Not done | no engineering need in a single-process simulation |
 
 ✅ Implemented = code exists and runs · 🧪 Tested = verified by automated tests or measured results
@@ -358,6 +374,7 @@ src/ari/
   learning/   observation/action spaces, demonstrations, behaviour cloning, DAgger, evaluation
   perception/ RGB-D camera model, colour + depth localization, noise model, vision-driven policy wrapper
   skills/     scripted, planned and reactive (state-feedback) pick-and-place, episode runner
+  so101/      the SO-101 hardware arm in simulation: FK, closed-form IK, scene, scripted pick-and-place
 scripts/      runnable experiments
 tests/        automated checks (kinematics vs MuJoCo, IK success rate, control behaviour)
 docs/         roadmap, development log, concept notes

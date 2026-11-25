@@ -538,3 +538,27 @@ differences, projected with N = I - J+J). Reaches +/-40 deg with the gripper mov
 
 ### The DH frames were invisible
 They sit inside the links. The arm is drawn see-through while frames are shown.
+
+## 2026-11-24: The SO-101, in simulation before buying it
+
+Built the low-cost arm I plan to buy (SO-101, Menagerie model) with the same checks as the Franka.
+
+### A 5-joint arm gets a closed-form IK
+Three parallel pitch joints and a wrist roll through the wrist: for a top-down grasp, base angle,
+law of cosines for shoulder and elbow, wrist flex to point down, roll for yaw. Position and
+orientation exact to ~1e-15. My first draft defaulted to one elbow branch and every table target
+broke a joint limit; now both branches are tried.
+
+### Finding: one moving jaw pushes the cube
+100/100 pick-and-place, but every grasp shoved the cube 9.8 mm toward the fixed jaw, and the
+placement error (5.6 mm median) came with it. Two wrong turns before the fix:
+- aiming the gripper at the full measured offset brought the fixed jaw down onto the cube: 0/40 lifted.
+  A 4 mm clearance fixes it.
+- compensating the place point by the *held* offset changed nothing. The squeezed cube springs
+  back ~4 mm when the jaw opens, so placing needs its own offset, measured after release.
+With both measured in one calibration episode: 2.0 mm median, 4.1 mm 95th percentile.
+
+### Payload is an upper bound
+1 kg lifts in simulation. The model has no backlash, heating or voltage sag, so the real number
+is a measurement for the hardware checklist, not a prediction.
+
